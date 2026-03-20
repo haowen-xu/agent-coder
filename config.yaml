@@ -1,0 +1,25 @@
+app:
+  name: agent-coder
+  env: dev
+
+server:
+  host: 0.0.0.0
+  port: 8080
+  read_timeout: 15s
+  write_timeout: 15s
+  shutdown_timeout: 10s
+
+log:
+  level: info
+  format: text
+  add_source: false
+
+db:
+  enabled: true
+  driver: sqlite
+  sqlite_path: agent-coder.db
+  postgres_dsn: ""
+  max_open_conns: 20
+  max_idle_conns: 10
+  conn_max_lifetime: 30m
+  auto_migrate: true

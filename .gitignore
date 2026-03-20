@@ -1,0 +1,19 @@
+# Go
+/bin/
+*.out
+coverage.out
+
+# Runtime
+*.db
+*.log
+__pycache__/
+*.pyc
+
+# Frontend
+webui/node_modules/
+webui/dist/
+
+# OS/Editor
+.DS_Store
+.vscode/
+.idea/
