@@ -6,9 +6,11 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
 
+	db "github.com/haowen-xu/agent-coder/internal/dal"
 	coresvc "github.com/haowen-xu/agent-coder/internal/service/core"
 )
 
@@ -117,13 +119,42 @@ type adminProjectRequest struct {
 	LabelMerged      string  `json:"label_merged"`
 }
 
+type adminProjectItem struct {
+	ID               uint       `json:"id"`
+	ProjectKey       string     `json:"project_key"`
+	ProjectSlug      string     `json:"project_slug"`
+	Name             string     `json:"name"`
+	Provider         string     `json:"provider"`
+	ProviderURL      string     `json:"provider_url"`
+	RepoURL          string     `json:"repo_url"`
+	DefaultBranch    string     `json:"default_branch"`
+	IssueProjectID   *string    `json:"issue_project_id,omitempty"`
+	CredentialRef    string     `json:"credential_ref"`
+	PollIntervalSec  int        `json:"poll_interval_sec"`
+	Enabled          bool       `json:"enabled"`
+	LastIssueSyncAt  *time.Time `json:"last_issue_sync_at,omitempty"`
+	LabelAgentReady  string     `json:"label_agent_ready"`
+	LabelInProgress  string     `json:"label_in_progress"`
+	LabelHumanReview string     `json:"label_human_review"`
+	LabelRework      string     `json:"label_rework"`
+	LabelVerified    string     `json:"label_verified"`
+	LabelMerged      string     `json:"label_merged"`
+	CreatedBy        uint       `json:"created_by"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
+}
+
 func (s *Server) adminListProjects(ctx context.Context, c *app.RequestContext) {
 	rows, err := s.svc.ListProjects(ctx)
 	if err != nil {
 		writeError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeOK(c, map[string]any{"items": rows})
+	out := make([]adminProjectItem, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toAdminProjectItem(row))
+	}
+	writeOK(c, map[string]any{"items": out})
 }
 
 func (s *Server) adminCreateProject(ctx context.Context, c *app.RequestContext) {
@@ -162,7 +193,7 @@ func (s *Server) adminCreateProject(ctx context.Context, c *app.RequestContext) 
 		writeError(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	writeOK(c, row)
+	writeOK(c, toAdminProjectItem(*row))
 }
 
 func (s *Server) adminUpdateProject(ctx context.Context, c *app.RequestContext) {
@@ -204,7 +235,7 @@ func (s *Server) adminUpdateProject(ctx context.Context, c *app.RequestContext) 
 		writeError(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	writeOK(c, row)
+	writeOK(c, toAdminProjectItem(*row))
 }
 
 type putPromptRequest struct {
@@ -280,4 +311,31 @@ func (s *Server) deleteProjectPrompt(ctx context.Context, c *app.RequestContext)
 		"agent_role":  agentRole,
 		"deleted":     true,
 	})
+}
+
+func toAdminProjectItem(row db.Project) adminProjectItem {
+	return adminProjectItem{
+		ID:               row.ID,
+		ProjectKey:       row.ProjectKey,
+		ProjectSlug:      row.ProjectSlug,
+		Name:             row.Name,
+		Provider:         row.Provider,
+		ProviderURL:      row.ProviderURL,
+		RepoURL:          row.RepoURL,
+		DefaultBranch:    row.DefaultBranch,
+		IssueProjectID:   row.IssueProjectID,
+		CredentialRef:    row.CredentialRef,
+		PollIntervalSec:  row.PollIntervalSec,
+		Enabled:          row.Enabled,
+		LastIssueSyncAt:  row.LastIssueSyncAt,
+		LabelAgentReady:  row.LabelAgentReady,
+		LabelInProgress:  row.LabelInProgress,
+		LabelHumanReview: row.LabelHumanReview,
+		LabelRework:      row.LabelRework,
+		LabelVerified:    row.LabelVerified,
+		LabelMerged:      row.LabelMerged,
+		CreatedBy:        row.CreatedBy,
+		CreatedAt:        row.CreatedAt,
+		UpdatedAt:        row.UpdatedAt,
+	}
 }
