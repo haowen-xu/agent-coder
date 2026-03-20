@@ -458,7 +458,8 @@ func (s *Service) finalizeIssue(
 
 		issue.LifecycleStatus = db.IssueLifecycleHumanReview
 		_ = tracker.SetIssueLabels(ctx, project, issue.IssueIID, []string{project.LabelHumanReview})
-		_ = tracker.CreateIssueNote(ctx, project, issue.IssueIID, "MR is ready for human review.")
+		note := buildMRReadyNote(issue.IssueIID, run.BranchName, project.DefaultBranch, mr)
+		_ = tracker.CreateIssueNote(ctx, project, issue.IssueIID, note)
 	case db.RunKindMerge:
 		if issue.MRIID != nil {
 			if err := tracker.MergeMergeRequest(ctx, project, *issue.MRIID); err != nil {
@@ -476,6 +477,50 @@ func (s *Service) finalizeIssue(
 		issue.LifecycleStatus = db.IssueLifecycleMerged
 	}
 	return s.db.SaveIssue(ctx, issue)
+}
+
+func buildMRReadyNote(
+	issueIID int64,
+	sourceBranch string,
+	targetBranch string,
+	mr *issuetracker.MergeRequest,
+) string {
+	if mr == nil {
+		return "MR is ready for human review."
+	}
+
+	mrRef := fmt.Sprintf("!%d", mr.IID)
+	if strings.TrimSpace(mr.WebURL) != "" {
+		mrRef = fmt.Sprintf("[!%d](%s)", mr.IID, strings.TrimSpace(mr.WebURL))
+	}
+	from := strings.TrimSpace(sourceBranch)
+	if from == "" {
+		from = strings.TrimSpace(mr.SourceBranch)
+	}
+	if from == "" {
+		from = "-"
+	}
+	to := strings.TrimSpace(targetBranch)
+	if to == "" {
+		to = strings.TrimSpace(mr.TargetBranch)
+	}
+	if to == "" {
+		to = "-"
+	}
+
+	return fmt.Sprintf(
+		`Agent run completed. MR is ready for human review.
+
+### AgentCoder MR
+- Issue: #%d
+- Merge Request: %s
+- Source Branch: %s
+- Target Branch: %s`,
+		issueIID,
+		mrRef,
+		fmt.Sprintf("`%s`", from),
+		fmt.Sprintf("`%s`", to),
+	)
 }
 
 func (s *Service) invokeRole(
