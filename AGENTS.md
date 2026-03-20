@@ -1,10 +1,9 @@
 # AI Agent 导航
 
-> 关键约束与协作规范请优先阅读 [docs/index.md](docs/index.md)。
+> 关键约束与协作规范请优先阅读下列文档。
 
 ## 快速入口
 
-- 文档总览: [docs/index.md](docs/index.md)
 - 工程架构: [docs/architecture.md](docs/architecture.md)
 - 数据库设计: [docs/database-schema.md](docs/database-schema.md)
 - Agent 运行设计: [docs/agent-runtime.md](docs/agent-runtime.md)

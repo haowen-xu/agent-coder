@@ -17,10 +17,8 @@
 
 ```text
 .
-├── cmd/
-│   └── agent-coder/
-│       └── main.go
 ├── cmds/
+│   ├── main.go
 │   ├── root.go
 │   ├── server.go
 │   ├── worker.go
@@ -77,7 +75,7 @@
 
 ## 命令体系（Cobra）
 
-- `cmd/agent-coder/main.go` 仅执行 `cmds.Execute()`。
+- `cmds/main.go` 是唯一入口，执行 `Execute()` 并挂载所有子命令。
 - `cmds/root.go` 挂载全局参数（配置文件、日志级别等）。
 - 子命令：
   - `server`：启动 API 服务
@@ -147,7 +145,7 @@
 
 ## 运行入口
 
-- 后端：`go run ./cmd/agent-coder server --config config.yaml`
-- Worker：`go run ./cmd/agent-coder worker --config config.yaml`
+- 后端：`go run ./cmds server --config config.yaml`
+- Worker：`go run ./cmds worker --config config.yaml`
 - 前端：`cd webui && pnpm dev`
 - 计划执行器：`python3 scripts/run_codex_on_plan.py --plan-file ...`

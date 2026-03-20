@@ -9,7 +9,7 @@
 
 - [ ] T1: 后端依赖与编译校验
   - 验收标准：`go mod tidy` 和 `go test ./...` 能通过
-  - 相关文件：`go.mod`、`internal/**`、`cmd/server/main.go`
+  - 相关文件：`go.mod`、`internal/**`、`cmds/server.go`
 
 - [ ] T2: 前端依赖与构建校验
   - 验收标准：`pnpm install`、`pnpm build` 能通过

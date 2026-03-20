@@ -9,7 +9,7 @@
 
 ### 目录与命名
 
-- 入口放在 `cmd/<name>/main.go`。
+- CLI 入口统一放在 `cmds/main.go`，子命令放在 `cmds/*.go`。
 - 业务实现放在 `internal/*`，避免对外暴露内部实现细节。
 - package 名使用小写短词，不使用下划线。
 
