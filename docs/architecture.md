@@ -107,6 +107,15 @@
   - `Verified`
   - `Merged`
 
+## Agent 执行抽象
+
+- 归属层级：`internal/infra/agent`
+- 分层：
+  - `base`：统一执行抽象与通用运行骨架
+  - `codex`：具体 provider 实现
+- 业务层只依赖 `base.Client`，不直接依赖 `codex` 命令细节。
+- run 工作目录由 `issue_runs.workdir_path` 提供，agent 实现只负责在该目录执行。
+
 ## 数据库策略（SQLite + PostgreSQL）
 
 - 只维护一个 GORM 实现，不拆双 DAL。

@@ -38,6 +38,12 @@
 - `infra/issuetracker/port.go` 抽象接口。
 - `infra/issuetracker/gitlab` 具体实现。
 
+## M3.1 Agent 抽象与 Codex 实现
+
+- `infra/agent/base`：定义通用 agent 调用接口和运行结果模型。
+- `infra/agent/codex`：提供 codex 命令执行与 resume 支持。
+- 保证 worker 仅依赖 `base`，不感知 provider 命令细节。
+
 ## M4 调度与执行器
 
 - 定时 pull issue。

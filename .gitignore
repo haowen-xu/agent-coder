@@ -6,6 +6,7 @@ coverage.out
 # Runtime
 *.db
 *.log
+.agent-coder/
 __pycache__/
 *.pyc
 
