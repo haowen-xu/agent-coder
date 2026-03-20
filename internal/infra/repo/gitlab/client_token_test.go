@@ -10,7 +10,7 @@ import (
 	"time"
 
 	db "github.com/haowen-xu/agent-coder/internal/dal"
-	"github.com/haowen-xu/agent-coder/internal/infra/issuetracker"
+	repocommon "github.com/haowen-xu/agent-coder/internal/infra/repo/common"
 )
 
 func TestClient_ListIssues_UsesProjectTokenFirst(t *testing.T) {
@@ -37,7 +37,7 @@ func TestClient_ListIssues_UsesProjectTokenFirst(t *testing.T) {
 	}
 
 	client := NewClient(slog.New(slog.NewTextHandler(io.Discard, nil)), 10*time.Second, nil)
-	issues, err := client.ListIssues(context.Background(), project, issuetracker.ListIssuesOptions{
+	issues, err := client.ListIssues(context.Background(), project, repocommon.ListIssuesOptions{
 		State:    "all",
 		PerPage:  20,
 		MaxPages: 1,

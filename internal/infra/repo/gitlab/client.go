@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/haowen-xu/agent-coder/internal/dal"
-	"github.com/haowen-xu/agent-coder/internal/infra/issuetracker"
+	repocommon "github.com/haowen-xu/agent-coder/internal/infra/repo/common"
 	"github.com/haowen-xu/agent-coder/internal/infra/secret"
 	"github.com/haowen-xu/agent-coder/internal/xerr"
 )
@@ -36,7 +36,7 @@ func NewClient(log *slog.Logger, timeout time.Duration, secretManager secret.Man
 	}
 }
 
-func (c *Client) ListIssues(ctx context.Context, project db.Project, opt issuetracker.ListIssuesOptions) ([]issuetracker.Issue, error) {
+func (c *Client) ListIssues(ctx context.Context, project db.Project, opt repocommon.ListIssuesOptions) ([]repocommon.Issue, error) {
 	state := strings.TrimSpace(opt.State)
 	if state == "" {
 		state = "all"
@@ -50,7 +50,7 @@ func (c *Client) ListIssues(ctx context.Context, project db.Project, opt issuetr
 		maxPages = 20
 	}
 
-	all := make([]issuetracker.Issue, 0, perPage)
+	all := make([]repocommon.Issue, 0, perPage)
 	for page := 1; page <= maxPages; page++ {
 		values := url.Values{}
 		values.Set("state", state)
@@ -72,7 +72,7 @@ func (c *Client) ListIssues(ctx context.Context, project db.Project, opt issuetr
 			return nil, err
 		}
 		for _, row := range rows {
-			all = append(all, issuetracker.Issue{
+			all = append(all, repocommon.Issue{
 				IID:       row.IID,
 				UID:       string(row.ID),
 				Title:     row.Title,
@@ -117,8 +117,8 @@ func (c *Client) CloseIssue(ctx context.Context, project db.Project, issueIID in
 func (c *Client) EnsureMergeRequest(
 	ctx context.Context,
 	project db.Project,
-	req issuetracker.CreateOrUpdateMRRequest,
-) (*issuetracker.MergeRequest, error) {
+	req repocommon.CreateOrUpdateMRRequest,
+) (*repocommon.MergeRequest, error) {
 	ref := url.PathEscape(c.projectRef(project))
 	listURL := c.endpoint(project, fmt.Sprintf(
 		"/projects/%s/merge_requests?state=opened&source_branch=%s&per_page=1",
@@ -131,7 +131,7 @@ func (c *Client) EnsureMergeRequest(
 	}
 	if len(exists) > 0 {
 		row := exists[0]
-		return &issuetracker.MergeRequest{
+		return &repocommon.MergeRequest{
 			IID:          row.IID,
 			WebURL:       row.WebURL,
 			SourceBranch: row.SourceBranch,
@@ -152,7 +152,7 @@ func (c *Client) EnsureMergeRequest(
 	if err := c.doJSON(ctx, project, http.MethodPost, createURL, payload, &created); err != nil {
 		return nil, err
 	}
-	return &issuetracker.MergeRequest{
+	return &repocommon.MergeRequest{
 		IID:          created.IID,
 		WebURL:       created.WebURL,
 		SourceBranch: created.SourceBranch,
@@ -195,7 +195,7 @@ func (c *Client) MergeMergeRequest(ctx context.Context, project db.Project, mrII
 		return nil
 	}
 	if shouldNeedHumanMerge(resp.StatusCode) {
-		return &issuetracker.ErrNeedHumanMerge{
+		return &repocommon.ErrNeedHumanMerge{
 			Provider:   db.ProviderGitLab,
 			StatusCode: resp.StatusCode,
 			Reason:     truncate(strings.TrimSpace(string(respRaw)), 512),

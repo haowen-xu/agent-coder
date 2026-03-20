@@ -1,4 +1,4 @@
-package issuetracker
+package common
 
 import (
 	"errors"

@@ -1,6 +1,6 @@
 //go:build e2e
 
-package gitlab
+package common
 
 import (
 	"bytes"
@@ -17,17 +17,7 @@ import (
 	"time"
 
 	db "github.com/haowen-xu/agent-coder/internal/dal"
-	"github.com/haowen-xu/agent-coder/internal/infra/issuetracker"
 )
-
-type IssueTracker interface {
-	ListIssues(ctx context.Context, project db.Project, opt issuetracker.ListIssuesOptions) ([]issuetracker.Issue, error)
-	SetIssueLabels(ctx context.Context, project db.Project, issueIID int64, labels []string) error
-	CreateIssueNote(ctx context.Context, project db.Project, issueIID int64, body string) error
-	CloseIssue(ctx context.Context, project db.Project, issueIID int64) error
-	EnsureMergeRequest(ctx context.Context, project db.Project, req issuetracker.CreateOrUpdateMRRequest) (*issuetracker.MergeRequest, error)
-	MergeMergeRequest(ctx context.Context, project db.Project, mrIID int64) error
-}
 
 type issueTrackerCommonRunner struct {
 	t       *testing.T
@@ -46,7 +36,7 @@ type issueTrackerCommonRunner struct {
 	createdTime time.Time
 }
 
-func runIssueTrackerCommonTests(t *testing.T, it IssueTracker) {
+func RunStandardIssueTrackerTests(t *testing.T, it Client) {
 	t.Helper()
 
 	cfg := loadGitLabE2EConfig(t)
@@ -126,12 +116,12 @@ func runIssueTrackerCommonTests(t *testing.T, it IssueTracker) {
 	runner.runCloseIssueTest(it)
 }
 
-func (r *issueTrackerCommonRunner) runListIssuesTest(it IssueTracker) {
+func (r *issueTrackerCommonRunner) runListIssuesTest(it Client) {
 	r.t.Helper()
 
 	updatedAfter := r.createdTime.Add(-2 * time.Minute)
 	err := waitFor(r.ctx, 20*time.Second, 2*time.Second, func() (bool, error) {
-		issues, err := it.ListIssues(r.ctx, r.project, issuetracker.ListIssuesOptions{
+		issues, err := it.ListIssues(r.ctx, r.project, ListIssuesOptions{
 			State:        "all",
 			UpdatedAfter: &updatedAfter,
 			PerPage:      50,
@@ -152,7 +142,7 @@ func (r *issueTrackerCommonRunner) runListIssuesTest(it IssueTracker) {
 	}
 }
 
-func (r *issueTrackerCommonRunner) runSetIssueLabelsTest(it IssueTracker) {
+func (r *issueTrackerCommonRunner) runSetIssueLabelsTest(it Client) {
 	r.t.Helper()
 
 	labels := []string{"Agent Ready", r.testLabel}
@@ -175,7 +165,7 @@ func (r *issueTrackerCommonRunner) runSetIssueLabelsTest(it IssueTracker) {
 	}
 }
 
-func (r *issueTrackerCommonRunner) runCreateIssueNoteTest(it IssueTracker) {
+func (r *issueTrackerCommonRunner) runCreateIssueNoteTest(it Client) {
 	r.t.Helper()
 
 	body := fmt.Sprintf("### AgentCoder E2E Todo %s\n- [ ] item-1\n- [x] item-2\n", r.noteNeedle)
@@ -200,7 +190,7 @@ func (r *issueTrackerCommonRunner) runCreateIssueNoteTest(it IssueTracker) {
 	}
 }
 
-func (r *issueTrackerCommonRunner) runEnsureMergeRequestTest(it IssueTracker) {
+func (r *issueTrackerCommonRunner) runEnsureMergeRequestTest(it Client) {
 	r.t.Helper()
 
 	if err := r.helper.createBranch(r.ctx, r.sourceBranch, r.defaultBranch); err != nil {
@@ -217,7 +207,7 @@ func (r *issueTrackerCommonRunner) runEnsureMergeRequestTest(it IssueTracker) {
 		r.t.Fatalf("create file failed: %v", err)
 	}
 
-	req := issuetracker.CreateOrUpdateMRRequest{
+	req := CreateOrUpdateMRRequest{
 		SourceBranch: r.sourceBranch,
 		TargetBranch: r.defaultBranch,
 		Title:        fmt.Sprintf("[E2E] MR %s", r.marker),
@@ -241,14 +231,14 @@ func (r *issueTrackerCommonRunner) runEnsureMergeRequestTest(it IssueTracker) {
 	}
 }
 
-func (r *issueTrackerCommonRunner) runMergeMergeRequestTest(it IssueTracker) {
+func (r *issueTrackerCommonRunner) runMergeMergeRequestTest(it Client) {
 	r.t.Helper()
 
 	if r.mrIID <= 0 {
 		r.t.Fatalf("runMergeMergeRequestTest invalid mrIID=%d", r.mrIID)
 	}
 	if err := it.MergeMergeRequest(r.ctx, r.project, r.mrIID); err != nil {
-		if issuetracker.IsNeedHumanMerge(err) {
+		if IsNeedHumanMerge(err) {
 			r.t.Logf("MergeMergeRequest returned need_human_merge, treat as covered: %v", err)
 			return
 		}
@@ -270,7 +260,7 @@ func (r *issueTrackerCommonRunner) runMergeMergeRequestTest(it IssueTracker) {
 	}
 }
 
-func (r *issueTrackerCommonRunner) runCloseIssueTest(it IssueTracker) {
+func (r *issueTrackerCommonRunner) runCloseIssueTest(it Client) {
 	r.t.Helper()
 
 	if err := it.CloseIssue(r.ctx, r.project, r.issueIID); err != nil {

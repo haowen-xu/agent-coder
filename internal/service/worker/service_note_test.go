@@ -4,13 +4,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/haowen-xu/agent-coder/internal/infra/issuetracker"
+	repocommon "github.com/haowen-xu/agent-coder/internal/infra/repo/common"
 )
 
 func TestBuildMRReadyNote_WithMRURL(t *testing.T) {
 	t.Parallel()
 
-	note := buildMRReadyNote(42, "agent-coder/issue-42", "main", &issuetracker.MergeRequest{
+	note := buildMRReadyNote(42, "agent-coder/issue-42", "main", &repocommon.MergeRequest{
 		IID:          128,
 		WebURL:       "https://gitlab.example.com/group/repo/-/merge_requests/128",
 		SourceBranch: "agent-coder/issue-42",

@@ -19,8 +19,8 @@ import (
 	"github.com/haowen-xu/agent-coder/internal/infra/agent/codex"
 	"github.com/haowen-xu/agent-coder/internal/infra/agent/promptstore"
 	infraGit "github.com/haowen-xu/agent-coder/internal/infra/git"
-	"github.com/haowen-xu/agent-coder/internal/infra/issuetracker"
-	"github.com/haowen-xu/agent-coder/internal/infra/issuetracker/gitlab"
+	repocommon "github.com/haowen-xu/agent-coder/internal/infra/repo/common"
+	"github.com/haowen-xu/agent-coder/internal/infra/repo/gitlab"
 	"github.com/haowen-xu/agent-coder/internal/infra/secret"
 )
 
@@ -120,7 +120,7 @@ func (s *Service) syncProjectIssues(ctx context.Context, project db.Project) err
 		t := project.LastIssueSyncAt.UTC()
 		updatedAfter = &t
 	}
-	issues, err := client.ListIssues(ctx, project, issuetracker.ListIssuesOptions{
+	issues, err := client.ListIssues(ctx, project, repocommon.ListIssuesOptions{
 		State:        "all",
 		UpdatedAfter: updatedAfter,
 		PerPage:      100,
@@ -411,7 +411,7 @@ func (s *Service) executeRun(ctx context.Context, run *db.IssueRun) error {
 	return s.finalizeIssue(ctx, tracker, *project, issue, run, failed, lastErr)
 }
 
-func (s *Service) newIssueTrackerClient(project db.Project) (issuetracker.Client, error) {
+func (s *Service) newIssueTrackerClient(project db.Project) (repocommon.Client, error) {
 	switch strings.ToLower(strings.TrimSpace(project.Provider)) {
 	case "", db.ProviderGitLab:
 		timeout := time.Duration(s.cfg.IssueProvider.HTTPTimeoutSec) * time.Second
@@ -423,7 +423,7 @@ func (s *Service) newIssueTrackerClient(project db.Project) (issuetracker.Client
 
 func (s *Service) finalizeIssue(
 	ctx context.Context,
-	tracker issuetracker.Client,
+	tracker repocommon.Client,
 	project db.Project,
 	issue *db.Issue,
 	run *db.IssueRun,
@@ -448,7 +448,7 @@ func (s *Service) finalizeIssue(
 
 	switch run.RunKind {
 	case db.RunKindDev:
-		mr, err := tracker.EnsureMergeRequest(ctx, project, issuetracker.CreateOrUpdateMRRequest{
+		mr, err := tracker.EnsureMergeRequest(ctx, project, repocommon.CreateOrUpdateMRRequest{
 			SourceBranch: run.BranchName,
 			TargetBranch: project.DefaultBranch,
 			Title:        fmt.Sprintf("AgentCoder: issue #%d %s", issue.IssueIID, issue.Title),
@@ -483,7 +483,7 @@ func (s *Service) finalizeIssue(
 	case db.RunKindMerge:
 		if issue.MRIID != nil {
 			if err := tracker.MergeMergeRequest(ctx, project, *issue.MRIID); err != nil {
-				if issuetracker.IsNeedHumanMerge(err) {
+				if repocommon.IsNeedHumanMerge(err) {
 					reason := db.IssueCloseReasonNeedHumanMerge
 					issue.LifecycleStatus = db.IssueLifecycleClosed
 					issue.CloseReason = &reason
@@ -512,7 +512,7 @@ func buildMRReadyNote(
 	issueIID int64,
 	sourceBranch string,
 	targetBranch string,
-	mr *issuetracker.MergeRequest,
+	mr *repocommon.MergeRequest,
 ) string {
 	if mr == nil {
 		return "MR is ready for human review."
@@ -753,7 +753,7 @@ func isUniqueConstraintErr(err error) bool {
 
 func (s *Service) markMergeFailure(
 	ctx context.Context,
-	tracker issuetracker.Client,
+	tracker repocommon.Client,
 	project db.Project,
 	issue *db.Issue,
 	run *db.IssueRun,
