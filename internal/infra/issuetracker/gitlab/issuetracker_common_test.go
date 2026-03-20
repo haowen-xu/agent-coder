@@ -1,0 +1,587 @@
+//go:build e2e
+
+package gitlab
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	db "github.com/haowen-xu/agent-coder/internal/dal"
+	"github.com/haowen-xu/agent-coder/internal/infra/issuetracker"
+)
+
+type IssueTracker interface {
+	ListIssues(ctx context.Context, project db.Project, opt issuetracker.ListIssuesOptions) ([]issuetracker.Issue, error)
+	SetIssueLabels(ctx context.Context, project db.Project, issueIID int64, labels []string) error
+	CreateIssueNote(ctx context.Context, project db.Project, issueIID int64, body string) error
+	CloseIssue(ctx context.Context, project db.Project, issueIID int64) error
+	EnsureMergeRequest(ctx context.Context, project db.Project, req issuetracker.CreateOrUpdateMRRequest) (*issuetracker.MergeRequest, error)
+	MergeMergeRequest(ctx context.Context, project db.Project, mrIID int64) error
+}
+
+type issueTrackerCommonRunner struct {
+	t       *testing.T
+	ctx     context.Context
+	helper  *gitLabE2EHelper
+	project db.Project
+
+	issueIID      int64
+	defaultBranch string
+	sourceBranch  string
+	mrIID         int64
+
+	marker      string
+	noteNeedle  string
+	testLabel   string
+	createdTime time.Time
+}
+
+func runIssueTrackerCommonTests(t *testing.T, it IssueTracker) {
+	t.Helper()
+
+	cfg := loadGitLabE2EConfig(t)
+	if !cfg.Ready() {
+		t.Skip("skip e2e issuetracker tests: missing env GITLAB_TESTBED_URL/GITLAB_TESTBED_PRJ_ID/GITLAB_TESTBED_PRJ_TOKEN")
+		return
+	}
+
+	ctx := context.Background()
+	helper := &gitLabE2EHelper{
+		http: &http.Client{Timeout: 30 * time.Second},
+		cfg:  cfg,
+	}
+
+	defaultBranch, err := helper.getDefaultBranch(ctx)
+	if err != nil {
+		t.Fatalf("get default branch: %v", err)
+	}
+	if strings.TrimSpace(defaultBranch) == "" {
+		defaultBranch = "main"
+	}
+
+	now := time.Now().UnixNano()
+	marker := fmt.Sprintf("agent-coder-e2e-%d", now)
+	title := fmt.Sprintf("[E2E] %s", marker)
+	desc := fmt.Sprintf("temporary issue for issuetracker e2e (%s)", marker)
+	issueIID, err := helper.createIssue(ctx, title, desc)
+	if err != nil {
+		t.Fatalf("create temporary issue: %v", err)
+	}
+
+	testLabel := fmt.Sprintf("e2e-%d", now)
+	noteNeedle := fmt.Sprintf("todo-marker-%d", now)
+	sourceBranch := fmt.Sprintf("agent-coder/e2e-%d", now)
+
+	projectID := cfg.ProjectID
+	token := cfg.Token
+	runner := &issueTrackerCommonRunner{
+		t:      t,
+		ctx:    ctx,
+		helper: helper,
+		project: db.Project{
+			Provider:       db.ProviderGitLab,
+			ProviderURL:    cfg.APIBase,
+			ProjectSlug:    cfg.ProjectSlug,
+			IssueProjectID: &projectID,
+			ProjectToken:   &token,
+			DefaultBranch:  defaultBranch,
+		},
+		issueIID:      issueIID,
+		defaultBranch: defaultBranch,
+		sourceBranch:  sourceBranch,
+		marker:        marker,
+		noteNeedle:    noteNeedle,
+		testLabel:     testLabel,
+		createdTime:   time.Now().UTC(),
+	}
+
+	t.Cleanup(func() {
+		if runner.sourceBranch != "" {
+			if err := helper.deleteBranch(ctx, runner.sourceBranch); err != nil && !isGitLabNotFound(err) {
+				t.Errorf("cleanup delete branch %q: %v", runner.sourceBranch, err)
+			}
+		}
+		if runner.issueIID > 0 {
+			if err := helper.deleteIssue(ctx, runner.issueIID); err != nil {
+				t.Errorf("cleanup delete issue iid=%d: %v", runner.issueIID, err)
+			}
+		}
+	})
+
+	runner.runListIssuesTest(it)
+	runner.runSetIssueLabelsTest(it)
+	runner.runCreateIssueNoteTest(it)
+	runner.runEnsureMergeRequestTest(it)
+	runner.runMergeMergeRequestTest(it)
+	runner.runCloseIssueTest(it)
+}
+
+func (r *issueTrackerCommonRunner) runListIssuesTest(it IssueTracker) {
+	r.t.Helper()
+
+	updatedAfter := r.createdTime.Add(-2 * time.Minute)
+	err := waitFor(r.ctx, 20*time.Second, 2*time.Second, func() (bool, error) {
+		issues, err := it.ListIssues(r.ctx, r.project, issuetracker.ListIssuesOptions{
+			State:        "all",
+			UpdatedAfter: &updatedAfter,
+			PerPage:      50,
+			MaxPages:     10,
+		})
+		if err != nil {
+			return false, err
+		}
+		for _, row := range issues {
+			if row.IID == r.issueIID {
+				return true, nil
+			}
+		}
+		return false, nil
+	})
+	if err != nil {
+		r.t.Fatalf("runListIssuesTest failed: %v", err)
+	}
+}
+
+func (r *issueTrackerCommonRunner) runSetIssueLabelsTest(it IssueTracker) {
+	r.t.Helper()
+
+	labels := []string{"Agent Ready", r.testLabel}
+	if err := it.SetIssueLabels(r.ctx, r.project, r.issueIID, labels); err != nil {
+		r.t.Fatalf("SetIssueLabels failed: %v", err)
+	}
+
+	err := waitFor(r.ctx, 20*time.Second, 2*time.Second, func() (bool, error) {
+		row, err := r.helper.getIssue(r.ctx, r.issueIID)
+		if err != nil {
+			return false, err
+		}
+		if row == nil {
+			return false, fmt.Errorf("issue %d not found", r.issueIID)
+		}
+		return containsLabel(row.Labels, labels[0]) && containsLabel(row.Labels, labels[1]), nil
+	})
+	if err != nil {
+		r.t.Fatalf("runSetIssueLabelsTest failed: %v", err)
+	}
+}
+
+func (r *issueTrackerCommonRunner) runCreateIssueNoteTest(it IssueTracker) {
+	r.t.Helper()
+
+	body := fmt.Sprintf("### AgentCoder E2E Todo %s\n- [ ] item-1\n- [x] item-2\n", r.noteNeedle)
+	if err := it.CreateIssueNote(r.ctx, r.project, r.issueIID, body); err != nil {
+		r.t.Fatalf("CreateIssueNote failed: %v", err)
+	}
+
+	err := waitFor(r.ctx, 20*time.Second, 2*time.Second, func() (bool, error) {
+		notes, err := r.helper.listIssueNotes(r.ctx, r.issueIID)
+		if err != nil {
+			return false, err
+		}
+		for _, note := range notes {
+			if strings.Contains(note.Body, r.noteNeedle) {
+				return true, nil
+			}
+		}
+		return false, nil
+	})
+	if err != nil {
+		r.t.Fatalf("runCreateIssueNoteTest failed: %v", err)
+	}
+}
+
+func (r *issueTrackerCommonRunner) runEnsureMergeRequestTest(it IssueTracker) {
+	r.t.Helper()
+
+	if err := r.helper.createBranch(r.ctx, r.sourceBranch, r.defaultBranch); err != nil {
+		r.t.Fatalf("create branch failed: %v", err)
+	}
+	filePath := fmt.Sprintf("agent-coder-e2e/%s.txt", r.marker)
+	if err := r.helper.createFile(
+		r.ctx,
+		r.sourceBranch,
+		filePath,
+		fmt.Sprintf("e2e marker %s\n", r.marker),
+		fmt.Sprintf("test: create e2e marker file (%s)", r.marker),
+	); err != nil {
+		r.t.Fatalf("create file failed: %v", err)
+	}
+
+	req := issuetracker.CreateOrUpdateMRRequest{
+		SourceBranch: r.sourceBranch,
+		TargetBranch: r.defaultBranch,
+		Title:        fmt.Sprintf("[E2E] MR %s", r.marker),
+		Description:  "temporary MR created by issuetracker e2e",
+	}
+	mr, err := it.EnsureMergeRequest(r.ctx, r.project, req)
+	if err != nil {
+		r.t.Fatalf("EnsureMergeRequest create failed: %v", err)
+	}
+	if mr == nil || mr.IID <= 0 {
+		r.t.Fatalf("EnsureMergeRequest create returned invalid MR: %#v", mr)
+	}
+	r.mrIID = mr.IID
+
+	mr2, err := it.EnsureMergeRequest(r.ctx, r.project, req)
+	if err != nil {
+		r.t.Fatalf("EnsureMergeRequest idempotent failed: %v", err)
+	}
+	if mr2 == nil || mr2.IID != r.mrIID {
+		r.t.Fatalf("EnsureMergeRequest idempotent mismatch: first=%d second=%v", r.mrIID, mr2)
+	}
+}
+
+func (r *issueTrackerCommonRunner) runMergeMergeRequestTest(it IssueTracker) {
+	r.t.Helper()
+
+	if r.mrIID <= 0 {
+		r.t.Fatalf("runMergeMergeRequestTest invalid mrIID=%d", r.mrIID)
+	}
+	if err := it.MergeMergeRequest(r.ctx, r.project, r.mrIID); err != nil {
+		if issuetracker.IsNeedHumanMerge(err) {
+			r.t.Logf("MergeMergeRequest returned need_human_merge, treat as covered: %v", err)
+			return
+		}
+		r.t.Fatalf("MergeMergeRequest failed: %v", err)
+	}
+
+	err := waitFor(r.ctx, 30*time.Second, 2*time.Second, func() (bool, error) {
+		row, err := r.helper.getMergeRequest(r.ctx, r.mrIID)
+		if err != nil {
+			return false, err
+		}
+		if row == nil {
+			return false, fmt.Errorf("mr %d not found", r.mrIID)
+		}
+		return strings.EqualFold(strings.TrimSpace(row.State), "merged"), nil
+	})
+	if err != nil {
+		r.t.Fatalf("runMergeMergeRequestTest failed: %v", err)
+	}
+}
+
+func (r *issueTrackerCommonRunner) runCloseIssueTest(it IssueTracker) {
+	r.t.Helper()
+
+	if err := it.CloseIssue(r.ctx, r.project, r.issueIID); err != nil {
+		r.t.Fatalf("CloseIssue failed: %v", err)
+	}
+
+	err := waitFor(r.ctx, 20*time.Second, 2*time.Second, func() (bool, error) {
+		row, err := r.helper.getIssue(r.ctx, r.issueIID)
+		if err != nil {
+			return false, err
+		}
+		if row == nil {
+			return false, fmt.Errorf("issue %d not found", r.issueIID)
+		}
+		return strings.EqualFold(strings.TrimSpace(row.State), "closed"), nil
+	})
+	if err != nil {
+		r.t.Fatalf("runCloseIssueTest failed: %v", err)
+	}
+}
+
+type gitLabE2EConfig struct {
+	ProjectURL  string
+	ProjectID   string
+	Token       string
+	ProjectSlug string
+	APIBase     string
+}
+
+func (c gitLabE2EConfig) Ready() bool {
+	return strings.TrimSpace(c.ProjectURL) != "" &&
+		strings.TrimSpace(c.ProjectID) != "" &&
+		strings.TrimSpace(c.Token) != "" &&
+		strings.TrimSpace(c.ProjectSlug) != "" &&
+		strings.TrimSpace(c.APIBase) != ""
+}
+
+func loadGitLabE2EConfig(t *testing.T) gitLabE2EConfig {
+	t.Helper()
+	loadDotEnvIfExists(t)
+
+	cfg := gitLabE2EConfig{
+		ProjectURL: strings.TrimSpace(os.Getenv("GITLAB_TESTBED_URL")),
+		ProjectID:  strings.TrimSpace(os.Getenv("GITLAB_TESTBED_PRJ_ID")),
+		Token:      strings.TrimSpace(os.Getenv("GITLAB_TESTBED_PRJ_TOKEN")),
+	}
+	if strings.TrimSpace(cfg.ProjectURL) == "" {
+		return cfg
+	}
+
+	u, err := url.Parse(cfg.ProjectURL)
+	if err != nil {
+		t.Fatalf("invalid GITLAB_TESTBED_URL: %v", err)
+	}
+	cfg.ProjectSlug = strings.Trim(strings.TrimPrefix(u.Path, "/"), "/")
+	if cfg.ProjectSlug == "" {
+		t.Fatalf("invalid GITLAB_TESTBED_URL path, missing project slug: %q", cfg.ProjectURL)
+	}
+	cfg.APIBase = strings.TrimRight((&url.URL{
+		Scheme: u.Scheme,
+		Host:   u.Host,
+		Path:   "/api/v4",
+	}).String(), "/")
+	return cfg
+}
+
+func loadDotEnvIfExists(t *testing.T) {
+	t.Helper()
+
+	path, ok, err := findFileUpwards(".env")
+	if err != nil || !ok {
+		return
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read .env: %v", err)
+	}
+	lines := strings.Split(string(raw), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		kv := strings.SplitN(line, "=", 2)
+		if len(kv) != 2 {
+			continue
+		}
+		key := strings.TrimSpace(kv[0])
+		val := strings.TrimSpace(kv[1])
+		if key == "" {
+			continue
+		}
+		val = strings.Trim(val, `"'`)
+		if os.Getenv(key) == "" {
+			_ = os.Setenv(key, val)
+		}
+	}
+}
+
+func findFileUpwards(name string) (string, bool, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", false, err
+	}
+	cur := wd
+	for i := 0; i < 8; i++ {
+		path := filepath.Join(cur, name)
+		if st, err := os.Stat(path); err == nil && !st.IsDir() {
+			return path, true, nil
+		}
+		next := filepath.Dir(cur)
+		if next == cur {
+			break
+		}
+		cur = next
+	}
+	return "", false, nil
+}
+
+type gitLabE2EHelper struct {
+	http *http.Client
+	cfg  gitLabE2EConfig
+}
+
+type gitLabIssueDTO struct {
+	IID    int64    `json:"iid"`
+	State  string   `json:"state"`
+	Labels []string `json:"labels"`
+}
+
+type gitLabNoteDTO struct {
+	ID   int64  `json:"id"`
+	Body string `json:"body"`
+}
+
+type gitLabMRDTO struct {
+	IID   int64  `json:"iid"`
+	State string `json:"state"`
+}
+
+type gitLabProjectDTO struct {
+	DefaultBranch string `json:"default_branch"`
+}
+
+func (h *gitLabE2EHelper) getDefaultBranch(ctx context.Context) (string, error) {
+	var row gitLabProjectDTO
+	if err := h.doJSON(ctx, http.MethodGet, fmt.Sprintf("/projects/%s", url.PathEscape(h.cfg.ProjectID)), nil, &row); err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(row.DefaultBranch), nil
+}
+
+func (h *gitLabE2EHelper) createIssue(ctx context.Context, title string, desc string) (int64, error) {
+	payload := map[string]any{
+		"title":       title,
+		"description": desc,
+	}
+	var row gitLabIssueDTO
+	if err := h.doJSON(ctx, http.MethodPost, fmt.Sprintf("/projects/%s/issues", url.PathEscape(h.cfg.ProjectID)), payload, &row); err != nil {
+		return 0, err
+	}
+	return row.IID, nil
+}
+
+func (h *gitLabE2EHelper) deleteIssue(ctx context.Context, issueIID int64) error {
+	return h.doJSON(ctx, http.MethodDelete, fmt.Sprintf("/projects/%s/issues/%d", url.PathEscape(h.cfg.ProjectID), issueIID), nil, nil)
+}
+
+func (h *gitLabE2EHelper) getIssue(ctx context.Context, issueIID int64) (*gitLabIssueDTO, error) {
+	var row gitLabIssueDTO
+	if err := h.doJSON(ctx, http.MethodGet, fmt.Sprintf("/projects/%s/issues/%d", url.PathEscape(h.cfg.ProjectID), issueIID), nil, &row); err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (h *gitLabE2EHelper) listIssueNotes(ctx context.Context, issueIID int64) ([]gitLabNoteDTO, error) {
+	var rows []gitLabNoteDTO
+	path := fmt.Sprintf(
+		"/projects/%s/issues/%d/notes?per_page=100&page=1&order_by=created_at&sort=desc",
+		url.PathEscape(h.cfg.ProjectID),
+		issueIID,
+	)
+	if err := h.doJSON(ctx, http.MethodGet, path, nil, &rows); err != nil {
+		return nil, err
+	}
+	return rows, nil
+}
+
+func (h *gitLabE2EHelper) createBranch(ctx context.Context, branch string, ref string) error {
+	payload := map[string]any{
+		"branch": branch,
+		"ref":    ref,
+	}
+	return h.doJSON(ctx, http.MethodPost, fmt.Sprintf("/projects/%s/repository/branches", url.PathEscape(h.cfg.ProjectID)), payload, nil)
+}
+
+func (h *gitLabE2EHelper) createFile(ctx context.Context, branch string, filePath string, content string, commitMessage string) error {
+	payload := map[string]any{
+		"branch":         branch,
+		"content":        content,
+		"commit_message": commitMessage,
+	}
+	path := fmt.Sprintf(
+		"/projects/%s/repository/files/%s",
+		url.PathEscape(h.cfg.ProjectID),
+		url.PathEscape(filePath),
+	)
+	return h.doJSON(ctx, http.MethodPost, path, payload, nil)
+}
+
+func (h *gitLabE2EHelper) deleteBranch(ctx context.Context, branch string) error {
+	path := fmt.Sprintf("/projects/%s/repository/branches/%s", url.PathEscape(h.cfg.ProjectID), url.PathEscape(branch))
+	return h.doJSON(ctx, http.MethodDelete, path, nil, nil)
+}
+
+func (h *gitLabE2EHelper) getMergeRequest(ctx context.Context, mrIID int64) (*gitLabMRDTO, error) {
+	path := fmt.Sprintf("/projects/%s/merge_requests/%d", url.PathEscape(h.cfg.ProjectID), mrIID)
+	var row gitLabMRDTO
+	if err := h.doJSON(ctx, http.MethodGet, path, nil, &row); err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (h *gitLabE2EHelper) doJSON(ctx context.Context, method string, path string, payload any, out any) error {
+	urlRaw := strings.TrimRight(h.cfg.APIBase, "/") + path
+	var body io.Reader
+	if payload != nil {
+		raw, err := json.Marshal(payload)
+		if err != nil {
+			return fmt.Errorf("marshal payload: %w", err)
+		}
+		body = bytes.NewReader(raw)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, urlRaw, body)
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("PRIVATE-TOKEN", h.cfg.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := h.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("send request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("read response: %w", err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf(
+			"gitlab api non-2xx method=%s path=%s status=%d body=%s",
+			method,
+			path,
+			resp.StatusCode,
+			truncateString(string(raw), 256),
+		)
+	}
+	if out != nil && len(raw) > 0 {
+		if err := json.Unmarshal(raw, out); err != nil {
+			return fmt.Errorf("unmarshal response: %w", err)
+		}
+	}
+	return nil
+}
+
+func waitFor(ctx context.Context, timeout time.Duration, interval time.Duration, check func() (bool, error)) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		ok, err := check()
+		if err != nil {
+			return err
+		}
+		if ok {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("timeout after %s", timeout)
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(interval):
+		}
+	}
+}
+
+func containsLabel(labels []string, target string) bool {
+	target = strings.TrimSpace(target)
+	for _, label := range labels {
+		if strings.EqualFold(strings.TrimSpace(label), target) {
+			return true
+		}
+	}
+	return false
+}
+
+func isGitLabNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	text := strings.ToLower(err.Error())
+	return strings.Contains(text, " status=404") || strings.Contains(text, " not found")
+}
+
+func truncateString(in string, max int) string {
+	if max <= 0 || len(in) <= max {
+		return in
+	}
+	return in[:max]
+}

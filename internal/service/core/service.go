@@ -384,8 +384,8 @@ func (s *Service) RetryIssue(ctx context.Context, issueID uint) (*db.Issue, erro
 	if issue == nil {
 		return nil, xerr.Config.New("issue not found")
 	}
-	if issue.LifecycleStatus == db.IssueLifecycleClosed || issue.LifecycleStatus == db.IssueLifecycleMerged {
-		return nil, xerr.Config.New("issue is already closed/merged")
+	if issue.LifecycleStatus == db.IssueLifecycleClosed {
+		return nil, xerr.Config.New("issue is already closed")
 	}
 	active, err := s.db.GetActiveRunByIssue(ctx, issue.ID)
 	if err != nil {
@@ -397,6 +397,7 @@ func (s *Service) RetryIssue(ctx context.Context, issueID uint) (*db.Issue, erro
 
 	issue.CurrentRunID = nil
 	issue.LifecycleStatus = db.IssueLifecycleRegistered
+	issue.CloseReason = nil
 	if err := s.db.SaveIssue(ctx, issue); err != nil {
 		return nil, err
 	}
@@ -438,6 +439,7 @@ func (s *Service) CancelRun(ctx context.Context, runID uint, reason string) (*db
 		default:
 			issue.LifecycleStatus = db.IssueLifecycleRegistered
 		}
+		issue.CloseReason = nil
 		if err := s.db.SaveIssue(ctx, issue); err != nil {
 			return nil, err
 		}

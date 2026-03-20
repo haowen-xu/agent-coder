@@ -143,6 +143,7 @@ func (c *Client) BindIssueRunIfIdle(ctx context.Context, issueID uint, runID uin
 		Updates(map[string]any{
 			"current_run_id":   runID,
 			"lifecycle_status": IssueLifecycleRunning,
+			"close_reason":     nil,
 			"branch_name":      branch,
 			"last_synced_at":   time.Now(),
 			"updated_at":       time.Now(),

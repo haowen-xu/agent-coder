@@ -28,6 +28,7 @@ type boardIssueItem struct {
 	Title           string     `json:"title"`
 	State           string     `json:"state"`
 	LifecycleStatus string     `json:"lifecycle_status"`
+	CloseReason     *string    `json:"close_reason,omitempty"`
 	BranchName      *string    `json:"branch_name,omitempty"`
 	MRIID           *int64     `json:"mr_iid,omitempty"`
 	MRURL           *string    `json:"mr_url,omitempty"`
@@ -91,6 +92,7 @@ func toBoardIssueItem(row db.Issue) boardIssueItem {
 		Title:           row.Title,
 		State:           row.State,
 		LifecycleStatus: row.LifecycleStatus,
+		CloseReason:     row.CloseReason,
 		BranchName:      row.BranchName,
 		MRIID:           row.MRIID,
 		MRURL:           row.MRURL,

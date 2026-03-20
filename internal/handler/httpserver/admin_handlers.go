@@ -461,6 +461,7 @@ func (s *Server) adminRetryIssue(ctx context.Context, c *app.RequestContext) {
 	writeOK(c, map[string]any{
 		"issue_id":         row.ID,
 		"lifecycle_status": row.LifecycleStatus,
+		"close_reason":     row.CloseReason,
 		"retried":          true,
 	})
 }

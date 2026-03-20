@@ -277,7 +277,7 @@ for loop_step in [1..max_loop_step] {
 ## 5.9 对现有流程的兼容
 
 - `run_kind=merge` 暂不引入 `plan`，保持 `merge -> review`（后续可扩展）。
-- 现有 `issue` 标签状态流不变：`Agent Ready -> In Progress -> Human Review -> Rework/Verified -> Merged`。
+- 现有 `issue` 标签状态流不变：`Agent Ready -> In Progress -> Human Review -> Rework/Verified -> Merged`（本地生命周期收敛为 `closed + close_reason`）。
 - `CreateIssueNote("agent run failed: ...")` 等失败提示保留。
 
 ## 6. 验收标准
@@ -341,4 +341,3 @@ M5（测试）：
 2. dev 子循环“无进展阈值”默认值取多少？（建议 3）
 3. todo note 是否固定一条更新，还是每轮新建？（建议固定一条 + 每轮评论增量）
 4. `run_kind=merge` 是否后续也接入 `plan`？（本期建议否）
-

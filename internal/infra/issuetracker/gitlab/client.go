@@ -74,7 +74,7 @@ func (c *Client) ListIssues(ctx context.Context, project db.Project, opt issuetr
 		for _, row := range rows {
 			all = append(all, issuetracker.Issue{
 				IID:       row.IID,
-				UID:       row.ID,
+				UID:       string(row.ID),
 				Title:     row.Title,
 				State:     row.State,
 				Labels:    row.Labels,
@@ -163,7 +163,51 @@ func (c *Client) EnsureMergeRequest(
 
 func (c *Client) MergeMergeRequest(ctx context.Context, project db.Project, mrIID int64) error {
 	endpoint := c.endpoint(project, fmt.Sprintf("/projects/%s/merge_requests/%d/merge", url.PathEscape(c.projectRef(project)), mrIID))
-	return c.doJSON(ctx, project, http.MethodPut, endpoint, map[string]any{}, nil)
+	raw, err := json.Marshal(map[string]any{})
+	if err != nil {
+		return xerr.Infra.Wrap(err, "marshal gitlab merge payload")
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, endpoint, bytes.NewReader(raw))
+	if err != nil {
+		return xerr.Infra.Wrap(err, "build gitlab merge request")
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	token, err := c.token(ctx, project)
+	if err != nil {
+		return err
+	}
+	if token != "" {
+		req.Header.Set("PRIVATE-TOKEN", token)
+	}
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return xerr.Infra.Wrap(err, "send gitlab merge request")
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	respRaw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return xerr.Infra.Wrap(err, "read gitlab merge response")
+	}
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return nil
+	}
+	if shouldNeedHumanMerge(resp.StatusCode) {
+		return &issuetracker.ErrNeedHumanMerge{
+			Provider:   db.ProviderGitLab,
+			StatusCode: resp.StatusCode,
+			Reason:     truncate(strings.TrimSpace(string(respRaw)), 512),
+		}
+	}
+
+	c.log.Warn("gitlab merge api non-2xx",
+		slog.String("url", endpoint),
+		slog.Int("status", resp.StatusCode),
+		slog.String("body", truncate(string(respRaw), 512)),
+	)
+	return xerr.Infra.New("gitlab api PUT %s failed with status=%d", endpoint, resp.StatusCode)
 }
 
 func (c *Client) endpoint(project db.Project, p string) string {
@@ -266,4 +310,13 @@ func truncate(in string, max int) string {
 		return in
 	}
 	return in[:max]
+}
+
+func shouldNeedHumanMerge(status int) bool {
+	switch status {
+	case http.StatusMethodNotAllowed, http.StatusNotAcceptable, http.StatusConflict, http.StatusUnprocessableEntity:
+		return true
+	default:
+		return false
+	}
 }

@@ -147,6 +147,7 @@ func (s *Service) syncProjectIssues(ctx context.Context, project db.Project) err
 		}
 		labelsJSON, _ := json.Marshal(it.Labels)
 		if localIssue == nil {
+			lifecycleStatus, closeReason := s.mapLifecycleByRemote(db.IssueLifecycleRegistered, nil, project, it.Labels, it.State)
 			row := &db.Issue{
 				ProjectID:       project.ID,
 				IssueIID:        it.IID,
@@ -154,10 +155,11 @@ func (s *Service) syncProjectIssues(ctx context.Context, project db.Project) err
 				State:           it.State,
 				LabelsJSON:      string(labelsJSON),
 				RegisteredAt:    time.Now(),
-				LifecycleStatus: s.mapLifecycleByLabels(db.IssueLifecycleRegistered, project, it.Labels, it.State),
+				LifecycleStatus: lifecycleStatus,
 				IssueDir:        "",
 				LastSyncedAt:    time.Now(),
 				ClosedAt:        it.ClosedAt,
+				CloseReason:     closeReason,
 			}
 			if it.UID != "" {
 				row.IssueUID = &it.UID
@@ -177,7 +179,7 @@ func (s *Service) syncProjectIssues(ctx context.Context, project db.Project) err
 		localIssue.LabelsJSON = string(labelsJSON)
 		localIssue.LastSyncedAt = time.Now()
 		localIssue.ClosedAt = it.ClosedAt
-		localIssue.LifecycleStatus = s.mapLifecycleByLabels(localIssue.LifecycleStatus, project, it.Labels, it.State)
+		localIssue.LifecycleStatus, localIssue.CloseReason = s.mapLifecycleByRemote(localIssue.LifecycleStatus, localIssue.CloseReason, project, it.Labels, it.State)
 		if localIssue.IssueDir == "" {
 			localIssue.IssueDir = s.issueRootDir(project.ID, localIssue.ID)
 		}
@@ -439,6 +441,7 @@ func (s *Service) finalizeIssue(
 		} else {
 			issue.LifecycleStatus = db.IssueLifecycleRegistered
 		}
+		issue.CloseReason = nil
 		_ = tracker.CreateIssueNote(ctx, project, issue.IssueIID, "agent run failed: "+lastErr)
 		return s.db.SaveIssue(ctx, issue)
 	}
@@ -453,6 +456,7 @@ func (s *Service) finalizeIssue(
 		})
 		if err != nil {
 			issue.LifecycleStatus = db.IssueLifecycleRegistered
+			issue.CloseReason = nil
 			run.Status = db.RunStatusFailed
 			run.ErrorSummary = stringPtr("ensure MR failed: " + err.Error())
 			if saveErr := s.db.SaveRun(ctx, run); saveErr != nil {
@@ -472,12 +476,20 @@ func (s *Service) finalizeIssue(
 		}
 
 		issue.LifecycleStatus = db.IssueLifecycleHumanReview
+		issue.CloseReason = nil
 		_ = tracker.SetIssueLabels(ctx, project, issue.IssueIID, []string{project.LabelHumanReview})
 		note := buildMRReadyNote(issue.IssueIID, run.BranchName, project.DefaultBranch, mr)
 		_ = tracker.CreateIssueNote(ctx, project, issue.IssueIID, note)
 	case db.RunKindMerge:
 		if issue.MRIID != nil {
 			if err := tracker.MergeMergeRequest(ctx, project, *issue.MRIID); err != nil {
+				if issuetracker.IsNeedHumanMerge(err) {
+					reason := db.IssueCloseReasonNeedHumanMerge
+					issue.LifecycleStatus = db.IssueLifecycleClosed
+					issue.CloseReason = &reason
+					_ = tracker.CreateIssueNote(ctx, project, issue.IssueIID, "need human merge: "+err.Error())
+					return s.db.SaveIssue(ctx, issue)
+				}
 				run.ConflictRetryCount++
 				run.Status = db.RunStatusFailed
 				run.ErrorSummary = stringPtr("merge MR failed: " + err.Error())
@@ -489,7 +501,9 @@ func (s *Service) finalizeIssue(
 		}
 		_ = tracker.SetIssueLabels(ctx, project, issue.IssueIID, []string{project.LabelMerged})
 		_ = tracker.CloseIssue(ctx, project, issue.IssueIID)
-		issue.LifecycleStatus = db.IssueLifecycleMerged
+		reason := db.IssueCloseReasonMerged
+		issue.LifecycleStatus = db.IssueLifecycleClosed
+		issue.CloseReason = &reason
 	}
 	return s.db.SaveIssue(ctx, issue)
 }
@@ -667,26 +681,41 @@ func (s *Service) shouldPollProject(project db.Project) bool {
 	return time.Since(last) >= time.Duration(project.PollIntervalSec)*time.Second
 }
 
-func (s *Service) mapLifecycleByLabels(current string, project db.Project, labels []string, issueState string) string {
-	if strings.EqualFold(issueState, "closed") {
-		return db.IssueLifecycleClosed
-	}
+func (s *Service) mapLifecycleByRemote(
+	current string,
+	currentCloseReason *string,
+	project db.Project,
+	labels []string,
+	issueState string,
+) (string, *string) {
 	if containsLabel(labels, project.LabelMerged) {
-		return db.IssueLifecycleMerged
+		reason := db.IssueCloseReasonMerged
+		return db.IssueLifecycleClosed, &reason
+	}
+	if strings.EqualFold(issueState, "closed") {
+		reason := db.IssueCloseReasonManual
+		return db.IssueLifecycleClosed, &reason
 	}
 	if containsLabel(labels, project.LabelVerified) {
-		return db.IssueLifecycleVerified
+		return db.IssueLifecycleVerified, nil
 	}
 	if containsLabel(labels, project.LabelRework) {
-		return db.IssueLifecycleRework
+		return db.IssueLifecycleRework, nil
 	}
 	if containsLabel(labels, project.LabelHumanReview) {
-		return db.IssueLifecycleHumanReview
+		return db.IssueLifecycleHumanReview, nil
+	}
+	if strings.EqualFold(strings.TrimSpace(current), "merged") {
+		reason := db.IssueCloseReasonMerged
+		return db.IssueLifecycleClosed, &reason
+	}
+	if strings.EqualFold(strings.TrimSpace(current), db.IssueLifecycleClosed) && currentCloseReason != nil {
+		return db.IssueLifecycleClosed, currentCloseReason
 	}
 	if current == "" {
-		return db.IssueLifecycleRegistered
+		return db.IssueLifecycleRegistered, nil
 	}
-	return current
+	return current, nil
 }
 
 func (s *Service) autoCommitAndPush(ctx context.Context, issue *db.Issue, run *db.IssueRun) error {
@@ -740,6 +769,7 @@ func (s *Service) markMergeFailure(
 	} else {
 		issue.LifecycleStatus = db.IssueLifecycleVerified
 	}
+	issue.CloseReason = nil
 	_ = tracker.CreateIssueNote(ctx, project, issue.IssueIID, "merge failed: "+reason)
 	return s.db.SaveIssue(ctx, issue)
 }

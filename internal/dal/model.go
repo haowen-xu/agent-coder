@@ -16,9 +16,14 @@ const (
 	IssueLifecycleHumanReview = "human_review"
 	IssueLifecycleRework      = "rework"
 	IssueLifecycleVerified    = "verified"
-	IssueLifecycleMerged      = "merged"
 	IssueLifecycleFailed      = "failed"
 	IssueLifecycleClosed      = "closed"
+)
+
+const (
+	IssueCloseReasonMerged         = "merged"
+	IssueCloseReasonManual         = "manual"
+	IssueCloseReasonNeedHumanMerge = "need_human_merge"
 )
 
 const (
@@ -121,6 +126,7 @@ type Issue struct {
 	CurrentRunID    *uint
 	LastSyncedAt    time.Time      `gorm:"not null"`
 	ClosedAt        *time.Time     `gorm:"type:timestamp"`
+	CloseReason     *string        `gorm:"size:32"`
 	CreatedAt       time.Time      `gorm:"not null"`
 	UpdatedAt       time.Time      `gorm:"not null"`
 	DeletedAt       gorm.DeletedAt `gorm:"index"`

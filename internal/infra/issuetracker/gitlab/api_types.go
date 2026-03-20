@@ -1,9 +1,37 @@
 package gitlab
 
-import "time"
+import (
+	"encoding/json"
+	"fmt"
+	"strconv"
+	"time"
+)
+
+type gitLabID string
+
+func (v *gitLabID) UnmarshalJSON(data []byte) error {
+	if len(data) == 0 || string(data) == "null" {
+		*v = ""
+		return nil
+	}
+	if data[0] == '"' {
+		var s string
+		if err := json.Unmarshal(data, &s); err != nil {
+			return err
+		}
+		*v = gitLabID(s)
+		return nil
+	}
+	var n int64
+	if err := json.Unmarshal(data, &n); err == nil {
+		*v = gitLabID(strconv.FormatInt(n, 10))
+		return nil
+	}
+	return fmt.Errorf("unsupported gitlab id payload: %s", string(data))
+}
 
 type gitLabIssue struct {
-	ID        string     `json:"id"`
+	ID        gitLabID   `json:"id"`
 	IID       int64      `json:"iid"`
 	Title     string     `json:"title"`
 	State     string     `json:"state"`

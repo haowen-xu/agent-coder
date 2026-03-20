@@ -126,6 +126,14 @@
 - `Verified`：人工确认可合并
 - `Merged`：已完成合并，自动关闭 issue
 
+补充（本地生命周期语义）：
+
+- 本地 `issues.lifecycle_status` 不再使用 `merged`，统一收敛为 `closed`。
+- 通过 `issues.close_reason` 区分关闭原因：
+  - `merged`：自动合并完成
+  - `manual`：远端人工关闭
+  - `need_human_merge`：issue tracker 不允许自动合并，转人工合并
+
 ## 11. Agent 介入硬门禁
 
 普通 issue 即使带有 `In Progress` / `Human Review` 等标签，也不允许 Agent 直接介入，且不会写入本地 `issues` 表。

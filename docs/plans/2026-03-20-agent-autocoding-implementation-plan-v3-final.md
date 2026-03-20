@@ -75,7 +75,7 @@
   - 产出 MR -> `Human Review`
   - 人工要求返工 -> `Rework`
   - 人工确认可合并 -> `Verified`
-  - 合并完成 -> `Merged` + 自动关闭 issue
+  - 合并完成 -> 打 `Merged` 标签 + 本地 `closed(close_reason=merged)` + 自动关闭 issue
 
 ## M6 冲突处理
 

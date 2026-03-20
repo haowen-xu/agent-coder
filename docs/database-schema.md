@@ -93,6 +93,7 @@ Issue 主实体与执行门禁状态。
 | current_run_id | BIGINT NULL | 当前运行 ID（可空，由应用层维护） |
 | last_synced_at | TIMESTAMP | NOT NULL |
 | closed_at | TIMESTAMP NULL | 远端关闭时间 |
+| close_reason | VARCHAR(32) NULL | 本地关闭原因：`merged/manual/need_human_merge` |
 | created_at | TIMESTAMP | NOT NULL |
 | updated_at | TIMESTAMP | NOT NULL |
 | deleted_at | TIMESTAMP NULL | 软删除 |
@@ -214,9 +215,14 @@ Issue 主实体与执行门禁状态。
 - `human_review`
 - `rework`
 - `verified`
-- `merged`
 - `failed`
 - `closed`
+
+`issues.close_reason` 建议值（仅 `lifecycle_status=closed` 时有意义）：
+
+- `merged`：自动合并完成后关闭
+- `manual`：远端被人工关闭
+- `need_human_merge`：issue tracker 不允许自动合并，转人工合并
 
 `issue_runs.status` 建议值：
 
@@ -248,9 +254,8 @@ Issue 主实体与执行门禁状态。
 - `human_review`：MR 已创建，等待人工评审
 - `rework`：人工要求返工
 - `verified`：人工确认可合并
-- `merged`：已完成合并
 - `failed`：自动流程失败且已达最大重试上限
-- `closed`：issue 已关闭（可由 `merged` 或人工关闭触发）
+- `closed`：issue 已关闭（结合 `close_reason` 区分关闭原因）
 
 切换条件（主路径）：
 
@@ -270,10 +275,12 @@ Issue 主实体与执行门禁状态。
   - 条件：人工打 `Verified` 标签
 - `verified -> running`
   - 条件：创建 `run_kind=merge` 的 `issue_runs` 并启动自动合并
-- `running -> merged`
-  - 条件：`run_kind=merge` 的 run 成功，MR 合并完成，打 `Merged` 标签并关闭 issue
+- `running -> closed`
+  - 条件：`run_kind=merge` 的 run 成功，MR 合并完成，打 `Merged` 标签并关闭 issue，`close_reason=merged`
+- `running -> closed`
+  - 条件：merge API 返回“需要人工合并”（`ErrNeedHumanMerge`），`close_reason=need_human_merge`
 - `* -> closed`
-  - 条件：远端 issue 被关闭（轮询同步到关闭态）
+  - 条件：远端 issue 被关闭（轮询同步到关闭态），`close_reason=manual`
 
 约束：
 

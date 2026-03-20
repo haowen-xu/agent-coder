@@ -1,6 +1,42 @@
 package issuetracker
 
-import "time"
+import (
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+)
+
+type ErrNeedHumanMerge struct {
+	Provider   string
+	StatusCode int
+	Reason     string
+}
+
+func (e *ErrNeedHumanMerge) Error() string {
+	if e == nil {
+		return "need human merge"
+	}
+	reason := strings.TrimSpace(e.Reason)
+	if reason == "" {
+		reason = "need human merge"
+	}
+	if strings.TrimSpace(e.Provider) == "" {
+		if e.StatusCode > 0 {
+			return fmt.Sprintf("%s (status=%d)", reason, e.StatusCode)
+		}
+		return reason
+	}
+	if e.StatusCode > 0 {
+		return fmt.Sprintf("%s provider=%s status=%d", reason, e.Provider, e.StatusCode)
+	}
+	return fmt.Sprintf("%s provider=%s", reason, e.Provider)
+}
+
+func IsNeedHumanMerge(err error) bool {
+	var target *ErrNeedHumanMerge
+	return errors.As(err, &target)
+}
 
 type Issue struct {
 	IID       int64
