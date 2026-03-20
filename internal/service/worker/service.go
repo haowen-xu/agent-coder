@@ -129,8 +129,10 @@ func (s *Service) syncProjectIssues(ctx context.Context, project db.Project) err
 	if err != nil {
 		return err
 	}
-	syncAt := time.Now().UTC()
-	lastIssueSyncAt := syncAt
+	var lastIssueSyncAt time.Time
+	if project.LastIssueSyncAt != nil && !project.LastIssueSyncAt.IsZero() {
+		lastIssueSyncAt = project.LastIssueSyncAt.UTC()
+	}
 
 	for _, it := range issues {
 		if !it.UpdatedAt.IsZero() && it.UpdatedAt.After(lastIssueSyncAt) {
@@ -182,6 +184,9 @@ func (s *Service) syncProjectIssues(ctx context.Context, project db.Project) err
 		if err := s.db.SaveIssue(ctx, localIssue); err != nil {
 			return err
 		}
+	}
+	if lastIssueSyncAt.IsZero() {
+		lastIssueSyncAt = time.Now().UTC()
 	}
 	project.LastIssueSyncAt = &lastIssueSyncAt
 	if err := s.db.SaveProject(ctx, &project); err != nil {
