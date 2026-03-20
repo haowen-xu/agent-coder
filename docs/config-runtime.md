@@ -48,7 +48,7 @@ scheduler:
   poll_interval_sec: 30
   run_every: 30s
 
-issue_provider:
+repo_provider:
   http_timeout_sec: 30
 
 bootstrap:
@@ -130,3 +130,8 @@ work_dir/
   - key 格式：`<env_prefix><SANITIZED_REF>`
   - 默认前缀：`AGENT_CODER_SECRET_`
 - `SANITIZED_REF` 规则：转大写，非字母数字字符替换为 `_`。
+
+兼容说明：
+
+- 历史配置键 `issue_provider.http_timeout_sec` 仍可用。
+- 新配置建议统一使用 `repo_provider.http_timeout_sec`。

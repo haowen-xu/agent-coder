@@ -21,6 +21,7 @@ type Config struct {
 	Work          WorkConfig          `mapstructure:"work"`
 	Agent         AgentConfig         `mapstructure:"agent"`
 	Scheduler     SchedulerConfig     `mapstructure:"scheduler"`
+	RepoProvider  RepoProviderConfig  `mapstructure:"repo_provider"`
 	IssueProvider IssueProviderConfig `mapstructure:"issue_provider"`
 	Bootstrap     BootstrapConfig     `mapstructure:"bootstrap"`
 }
@@ -87,9 +88,13 @@ type SchedulerConfig struct {
 	RunEvery        string `mapstructure:"run_every"`
 }
 
-type IssueProviderConfig struct {
+type RepoProviderConfig struct {
 	HTTPTimeoutSec int `mapstructure:"http_timeout_sec"`
 }
+
+// IssueProviderConfig 保留兼容旧配置项 issue_provider。
+// 新配置建议使用 repo_provider。
+type IssueProviderConfig = RepoProviderConfig
 
 type BootstrapConfig struct {
 	AdminUsername string `mapstructure:"admin_username"`
@@ -177,6 +182,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("scheduler.poll_interval_sec", 30)
 	v.SetDefault("scheduler.run_every", "30s")
 
+	v.SetDefault("repo_provider.http_timeout_sec", 30)
 	v.SetDefault("issue_provider.http_timeout_sec", 30)
 
 	v.SetDefault("bootstrap.admin_username", "admin")
@@ -243,6 +249,21 @@ func (c *Config) Validate() error {
 
 func (c *ServerConfig) Address() string {
 	return fmt.Sprintf("%s:%d", c.Host, c.Port)
+}
+
+// RepoHTTPTimeoutSec 返回仓库平台 API 超时配置。
+// 优先读取 repo_provider，若未配置则回退到 issue_provider（兼容旧字段）。
+func (c *Config) RepoHTTPTimeoutSec() int {
+	if c == nil {
+		return 30
+	}
+	if c.RepoProvider.HTTPTimeoutSec > 0 {
+		return c.RepoProvider.HTTPTimeoutSec
+	}
+	if c.IssueProvider.HTTPTimeoutSec > 0 {
+		return c.IssueProvider.HTTPTimeoutSec
+	}
+	return 30
 }
 
 func (c *ServerConfig) ReadTimeoutDuration() time.Duration {

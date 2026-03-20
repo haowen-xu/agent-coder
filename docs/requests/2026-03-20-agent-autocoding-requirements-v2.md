@@ -2,7 +2,7 @@
 
 ## 1. 产品定位
 
-本项目定位为一个基于 Issue Tracker 的自动研发执行系统，核心目标是让 Agent 围绕 Issue 完成端到端交付闭环。
+本项目定位为一个基于仓库协作平台的自动研发执行系统，核心目标是让 Agent 围绕 Issue 完成端到端交付闭环。
 
 ## 2. 核心能力（你已确认）
 
@@ -19,8 +19,8 @@
 - 支持多项目（multi-project）
 - 每个项目绑定：
   - 一个代码仓库（Repository）
-  - 一个 Issue Tracker 项目（Project）
-- 代码仓库与 Issue Tracker 可以来自同一平台（如 GitLab/GitHub），也允许跨平台组合
+  - 一个仓库协作平台项目（Project）
+- 代码仓库与仓库协作平台可以来自同一平台（如 GitLab/GitHub），也允许跨平台组合
 
 ## 3. 领域模型（建议）
 
@@ -33,7 +33,7 @@
 - `repo.url`：仓库地址
 - `repo.default_branch`：默认分支（通常 `main`）
 - `issue.provider`：`github` | `gitlab` | `jira` | `other`
-- `issue.project_id`：Issue Tracker 的项目标识
+- `issue.project_id`：仓库协作平台的项目标识
 - `credential_ref`：凭据引用（不直接存明文 token）
 
 ## 3.2 WorkItem

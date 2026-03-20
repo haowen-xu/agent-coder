@@ -36,7 +36,7 @@
 
 ## 2.2 projects
 
-项目绑定（repo + issue provider + 标签映射）。
+项目绑定（repo + repo provider + 标签映射）。
 
 | 字段 | 类型 | 约束/说明 |
 |---|---|---|
@@ -222,7 +222,7 @@ Issue 主实体与执行门禁状态。
 
 - `merged`：自动合并完成后关闭
 - `manual`：远端被人工关闭
-- `need_human_merge`：issue tracker 不允许自动合并，转人工合并
+- `need_human_merge`：仓库协作平台不允许自动合并，转人工合并
 
 `issue_runs.status` 建议值：
 
@@ -368,7 +368,7 @@ Issue 主实体与执行门禁状态。
 
 ## 6. Issue 同步游标规则
 
-- Worker 调用 issue tracker 使用：
+- Worker 调用仓库协作平台接口时使用：
   - `state=all`
   - `updated_after=projects.last_issue_sync_at`（若为空则全量首扫）
 - 同步成功后回写 `projects.last_issue_sync_at`。

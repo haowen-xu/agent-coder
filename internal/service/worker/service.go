@@ -111,7 +111,7 @@ func (s *Service) RunOnce(ctx context.Context) error {
 }
 
 func (s *Service) syncProjectIssues(ctx context.Context, project db.Project) error {
-	client, err := s.newIssueTrackerClient(project)
+	client, err := s.newRepoClient(project)
 	if err != nil {
 		return err
 	}
@@ -285,7 +285,7 @@ func (s *Service) executeRun(ctx context.Context, run *db.IssueRun) error {
 	if project == nil {
 		return nil
 	}
-	tracker, err := s.newIssueTrackerClient(*project)
+	repoClient, err := s.newRepoClient(*project)
 	if err != nil {
 		return err
 	}
@@ -312,7 +312,7 @@ func (s *Service) executeRun(ctx context.Context, run *db.IssueRun) error {
 		return err
 	}
 
-	_ = tracker.SetIssueLabels(ctx, *project, issue.IssueIID, []string{project.LabelAgentReady, project.LabelInProgress})
+	_ = repoClient.SetIssueLabels(ctx, *project, issue.IssueIID, []string{project.LabelAgentReady, project.LabelInProgress})
 
 	if run.RunKind == db.RunKindMerge {
 		conflict, mergeOut, mergeErr := s.git.TryMergeDefault(ctx, run.GitTreePath, project.DefaultBranch)
@@ -322,7 +322,7 @@ func (s *Service) executeRun(ctx context.Context, run *db.IssueRun) error {
 			if saveErr := s.db.SaveRun(ctx, run); saveErr != nil {
 				return saveErr
 			}
-			return s.markMergeFailure(ctx, tracker, *project, issue, run, mergeErr.Error())
+			return s.markMergeFailure(ctx, repoClient, *project, issue, run, mergeErr.Error())
 		}
 		if conflict {
 			run.ConflictRetryCount++
@@ -338,7 +338,7 @@ func (s *Service) executeRun(ctx context.Context, run *db.IssueRun) error {
 				if saveErr := s.db.SaveRun(ctx, run); saveErr != nil {
 					return saveErr
 				}
-				return s.markMergeFailure(ctx, tracker, *project, issue, run, "max conflict retry exceeded")
+				return s.markMergeFailure(ctx, repoClient, *project, issue, run, "max conflict retry exceeded")
 			}
 			if err := s.db.SaveRun(ctx, run); err != nil {
 				return err
@@ -408,13 +408,13 @@ func (s *Service) executeRun(ctx context.Context, run *db.IssueRun) error {
 		return err
 	}
 
-	return s.finalizeIssue(ctx, tracker, *project, issue, run, failed, lastErr)
+	return s.finalizeIssue(ctx, repoClient, *project, issue, run, failed, lastErr)
 }
 
-func (s *Service) newIssueTrackerClient(project db.Project) (repocommon.Client, error) {
+func (s *Service) newRepoClient(project db.Project) (repocommon.Client, error) {
 	switch strings.ToLower(strings.TrimSpace(project.Provider)) {
 	case "", db.ProviderGitLab:
-		timeout := time.Duration(s.cfg.IssueProvider.HTTPTimeoutSec) * time.Second
+		timeout := time.Duration(s.cfg.RepoHTTPTimeoutSec()) * time.Second
 		return gitlab.NewClient(s.log, timeout, s.secret), nil
 	default:
 		return nil, errorx.IllegalArgument.New("unsupported provider: %s", project.Provider)
@@ -423,7 +423,7 @@ func (s *Service) newIssueTrackerClient(project db.Project) (repocommon.Client, 
 
 func (s *Service) finalizeIssue(
 	ctx context.Context,
-	tracker repocommon.Client,
+	repoClient repocommon.Client,
 	project db.Project,
 	issue *db.Issue,
 	run *db.IssueRun,
@@ -442,13 +442,13 @@ func (s *Service) finalizeIssue(
 			issue.LifecycleStatus = db.IssueLifecycleRegistered
 		}
 		issue.CloseReason = nil
-		_ = tracker.CreateIssueNote(ctx, project, issue.IssueIID, "agent run failed: "+lastErr)
+		_ = repoClient.CreateIssueNote(ctx, project, issue.IssueIID, "agent run failed: "+lastErr)
 		return s.db.SaveIssue(ctx, issue)
 	}
 
 	switch run.RunKind {
 	case db.RunKindDev:
-		mr, err := tracker.EnsureMergeRequest(ctx, project, repocommon.CreateOrUpdateMRRequest{
+		mr, err := repoClient.EnsureMergeRequest(ctx, project, repocommon.CreateOrUpdateMRRequest{
 			SourceBranch: run.BranchName,
 			TargetBranch: project.DefaultBranch,
 			Title:        fmt.Sprintf("AgentCoder: issue #%d %s", issue.IssueIID, issue.Title),
@@ -462,7 +462,7 @@ func (s *Service) finalizeIssue(
 			if saveErr := s.db.SaveRun(ctx, run); saveErr != nil {
 				return saveErr
 			}
-			_ = tracker.CreateIssueNote(ctx, project, issue.IssueIID, "failed to create/update MR: "+err.Error())
+			_ = repoClient.CreateIssueNote(ctx, project, issue.IssueIID, "failed to create/update MR: "+err.Error())
 			return s.db.SaveIssue(ctx, issue)
 		}
 		if mr != nil {
@@ -477,17 +477,17 @@ func (s *Service) finalizeIssue(
 
 		issue.LifecycleStatus = db.IssueLifecycleHumanReview
 		issue.CloseReason = nil
-		_ = tracker.SetIssueLabels(ctx, project, issue.IssueIID, []string{project.LabelHumanReview})
+		_ = repoClient.SetIssueLabels(ctx, project, issue.IssueIID, []string{project.LabelHumanReview})
 		note := buildMRReadyNote(issue.IssueIID, run.BranchName, project.DefaultBranch, mr)
-		_ = tracker.CreateIssueNote(ctx, project, issue.IssueIID, note)
+		_ = repoClient.CreateIssueNote(ctx, project, issue.IssueIID, note)
 	case db.RunKindMerge:
 		if issue.MRIID != nil {
-			if err := tracker.MergeMergeRequest(ctx, project, *issue.MRIID); err != nil {
+			if err := repoClient.MergeMergeRequest(ctx, project, *issue.MRIID); err != nil {
 				if repocommon.IsNeedHumanMerge(err) {
 					reason := db.IssueCloseReasonNeedHumanMerge
 					issue.LifecycleStatus = db.IssueLifecycleClosed
 					issue.CloseReason = &reason
-					_ = tracker.CreateIssueNote(ctx, project, issue.IssueIID, "need human merge: "+err.Error())
+					_ = repoClient.CreateIssueNote(ctx, project, issue.IssueIID, "need human merge: "+err.Error())
 					return s.db.SaveIssue(ctx, issue)
 				}
 				run.ConflictRetryCount++
@@ -496,11 +496,11 @@ func (s *Service) finalizeIssue(
 				if saveErr := s.db.SaveRun(ctx, run); saveErr != nil {
 					return saveErr
 				}
-				return s.markMergeFailure(ctx, tracker, project, issue, run, err.Error())
+				return s.markMergeFailure(ctx, repoClient, project, issue, run, err.Error())
 			}
 		}
-		_ = tracker.SetIssueLabels(ctx, project, issue.IssueIID, []string{project.LabelMerged})
-		_ = tracker.CloseIssue(ctx, project, issue.IssueIID)
+		_ = repoClient.SetIssueLabels(ctx, project, issue.IssueIID, []string{project.LabelMerged})
+		_ = repoClient.CloseIssue(ctx, project, issue.IssueIID)
 		reason := db.IssueCloseReasonMerged
 		issue.LifecycleStatus = db.IssueLifecycleClosed
 		issue.CloseReason = &reason
@@ -753,7 +753,7 @@ func isUniqueConstraintErr(err error) bool {
 
 func (s *Service) markMergeFailure(
 	ctx context.Context,
-	tracker repocommon.Client,
+	repoClient repocommon.Client,
 	project db.Project,
 	issue *db.Issue,
 	run *db.IssueRun,
@@ -770,7 +770,7 @@ func (s *Service) markMergeFailure(
 		issue.LifecycleStatus = db.IssueLifecycleVerified
 	}
 	issue.CloseReason = nil
-	_ = tracker.CreateIssueNote(ctx, project, issue.IssueIID, "merge failed: "+reason)
+	_ = repoClient.CreateIssueNote(ctx, project, issue.IssueIID, "merge failed: "+reason)
 	return s.db.SaveIssue(ctx, issue)
 }
 

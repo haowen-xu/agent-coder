@@ -4,7 +4,7 @@
 
 ## 1. 产品定位
 
-系统用于基于 Issue Tracker 的自动研发执行，覆盖从 Issue 到 MR 的闭环。
+系统用于基于仓库协作平台的自动研发执行，覆盖从 Issue 到 MR 的闭环。
 
 ## 2. 功能目标
 
@@ -30,7 +30,7 @@
 支持多项目。每个项目绑定：
 
 - 一个代码仓库
-- 一个 issue tracker 项目（V1 为 GitLab project）
+- 一个仓库协作平台项目（V1 为 GitLab project）
 - 独立 `project_key`
 - 项目级标签映射配置（可覆盖默认值）
 
@@ -96,7 +96,7 @@
 
 - 后端分层：`handler / service / dal / infra`
 - 命令入口：`cmds/` + `spf13/cobra`
-- `infra` 必须包含 issue tracker 抽象与 GitLab 实现
+- `infra` 必须包含仓库协作平台抽象与 GitLab 实现
 - WebUI 编译产物由 Go `go:embed` 挂载
 - GORM 使用单实现，依赖 `sqlDialect string` 在方言敏感点切换
 
@@ -112,7 +112,7 @@
 
 - `issue_project_id` 允许为 `NULL`（兼容不提供项目 ID 的平台场景）。
 - 新增 `project_slug`（`VARCHAR`），用于保存平台侧稳定可读标识（如 `group/repo`、`owner/repo`）。
-- `provider_url` 必填，表示 issue provider 的 API endpoint（例如 `https://gitlab.example.com/api/v4`）。
+- `provider_url` 必填，表示仓库协作平台 API endpoint（例如 `https://gitlab.example.com/api/v4`）。
 - `repo_url` 仅表示代码仓库地址（例如 `git@...` 或 `https://...git`），两者不能混用。
 
 ## 10. Issue 标签工作流（默认值）
@@ -132,7 +132,7 @@
 - 通过 `issues.close_reason` 区分关闭原因：
   - `merged`：自动合并完成
   - `manual`：远端人工关闭
-  - `need_human_merge`：issue tracker 不允许自动合并，转人工合并
+  - `need_human_merge`：仓库协作平台不允许自动合并，转人工合并
 
 ## 11. Agent 介入硬门禁
 

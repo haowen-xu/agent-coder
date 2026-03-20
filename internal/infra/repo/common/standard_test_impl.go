@@ -19,29 +19,32 @@ import (
 	db "github.com/haowen-xu/agent-coder/internal/dal"
 )
 
+// issueTrackerCommonRunner 封装标准 e2e 测试运行时上下文。
 type issueTrackerCommonRunner struct {
-	t       *testing.T
-	ctx     context.Context
-	helper  *gitLabE2EHelper
-	project db.Project
+	t       *testing.T       // t 是当前测试句柄。
+	ctx     context.Context  // ctx 是标准测试使用的上下文。
+	helper  *gitLabE2EHelper // helper 是 GitLab API 辅助调用器。
+	project db.Project       // project 是待测仓库项目配置。
 
-	issueIID      int64
-	defaultBranch string
-	sourceBranch  string
-	mrIID         int64
+	issueIID      int64  // issueIID 是临时 issue 的 IID。
+	defaultBranch string // defaultBranch 是项目默认分支。
+	sourceBranch  string // sourceBranch 是测试临时源分支。
+	mrIID         int64  // mrIID 是测试过程中生成的 MR IID。
 
-	marker      string
-	noteNeedle  string
-	testLabel   string
-	createdTime time.Time
+	marker      string    // marker 是本轮测试唯一标记。
+	noteNeedle  string    // noteNeedle 用于断言评论是否写入。
+	testLabel   string    // testLabel 是测试标签名。
+	createdTime time.Time // createdTime 是测试数据创建时间。
 }
 
-func RunStandardIssueTrackerTests(t *testing.T, it Client) {
+// RunStandardRepoTests 运行仓库平台标准 e2e 套件。
+// 该函数由各平台实现复用，用于验证统一接口语义（Issue/MR/Merge）。
+func RunStandardRepoTests(t *testing.T, it Client) {
 	t.Helper()
 
 	cfg := loadGitLabE2EConfig(t)
 	if !cfg.Ready() {
-		t.Skip("skip e2e issuetracker tests: missing env GITLAB_TESTBED_URL/GITLAB_TESTBED_PRJ_ID/GITLAB_TESTBED_PRJ_TOKEN")
+		t.Skip("skip e2e repo tests: missing env GITLAB_TESTBED_URL/GITLAB_TESTBED_PRJ_ID/GITLAB_TESTBED_PRJ_TOKEN")
 		return
 	}
 
@@ -62,7 +65,7 @@ func RunStandardIssueTrackerTests(t *testing.T, it Client) {
 	now := time.Now().UnixNano()
 	marker := fmt.Sprintf("agent-coder-e2e-%d", now)
 	title := fmt.Sprintf("[E2E] %s", marker)
-	desc := fmt.Sprintf("temporary issue for issuetracker e2e (%s)", marker)
+	desc := fmt.Sprintf("temporary issue for repo e2e (%s)", marker)
 	issueIID, err := helper.createIssue(ctx, title, desc)
 	if err != nil {
 		t.Fatalf("create temporary issue: %v", err)
@@ -116,6 +119,7 @@ func RunStandardIssueTrackerTests(t *testing.T, it Client) {
 	runner.runCloseIssueTest(it)
 }
 
+// runListIssuesTest 验证 ListIssues 能在增量窗口内拉到测试 issue。
 func (r *issueTrackerCommonRunner) runListIssuesTest(it Client) {
 	r.t.Helper()
 
@@ -142,6 +146,7 @@ func (r *issueTrackerCommonRunner) runListIssuesTest(it Client) {
 	}
 }
 
+// runSetIssueLabelsTest 验证标签写入与远端可见性。
 func (r *issueTrackerCommonRunner) runSetIssueLabelsTest(it Client) {
 	r.t.Helper()
 
@@ -165,6 +170,7 @@ func (r *issueTrackerCommonRunner) runSetIssueLabelsTest(it Client) {
 	}
 }
 
+// runCreateIssueNoteTest 验证评论创建能力。
 func (r *issueTrackerCommonRunner) runCreateIssueNoteTest(it Client) {
 	r.t.Helper()
 
@@ -190,6 +196,7 @@ func (r *issueTrackerCommonRunner) runCreateIssueNoteTest(it Client) {
 	}
 }
 
+// runEnsureMergeRequestTest 验证 MR 创建与幂等复用行为。
 func (r *issueTrackerCommonRunner) runEnsureMergeRequestTest(it Client) {
 	r.t.Helper()
 
@@ -211,7 +218,7 @@ func (r *issueTrackerCommonRunner) runEnsureMergeRequestTest(it Client) {
 		SourceBranch: r.sourceBranch,
 		TargetBranch: r.defaultBranch,
 		Title:        fmt.Sprintf("[E2E] MR %s", r.marker),
-		Description:  "temporary MR created by issuetracker e2e",
+		Description:  "temporary MR created by repo e2e",
 	}
 	mr, err := it.EnsureMergeRequest(r.ctx, r.project, req)
 	if err != nil {
@@ -231,6 +238,7 @@ func (r *issueTrackerCommonRunner) runEnsureMergeRequestTest(it Client) {
 	}
 }
 
+// runMergeMergeRequestTest 验证自动合并路径或 need_human_merge 语义。
 func (r *issueTrackerCommonRunner) runMergeMergeRequestTest(it Client) {
 	r.t.Helper()
 
@@ -260,6 +268,7 @@ func (r *issueTrackerCommonRunner) runMergeMergeRequestTest(it Client) {
 	}
 }
 
+// runCloseIssueTest 验证 issue 关闭能力。
 func (r *issueTrackerCommonRunner) runCloseIssueTest(it Client) {
 	r.t.Helper()
 
@@ -282,14 +291,16 @@ func (r *issueTrackerCommonRunner) runCloseIssueTest(it Client) {
 	}
 }
 
+// gitLabE2EConfig 描述标准 e2e 用例所需的 GitLab 连接参数。
 type gitLabE2EConfig struct {
-	ProjectURL  string
-	ProjectID   string
-	Token       string
-	ProjectSlug string
-	APIBase     string
+	ProjectURL  string // ProjectURL 是测试仓库页面地址。
+	ProjectID   string // ProjectID 是 GitLab 项目 ID。
+	Token       string // Token 是项目访问令牌。
+	ProjectSlug string // ProjectSlug 是 group/repo 形式的仓库标识。
+	APIBase     string // APIBase 是 GitLab API 根地址。
 }
 
+// Ready 判断 e2e 所需配置是否完整。
 func (c gitLabE2EConfig) Ready() bool {
 	return strings.TrimSpace(c.ProjectURL) != "" &&
 		strings.TrimSpace(c.ProjectID) != "" &&
@@ -298,6 +309,7 @@ func (c gitLabE2EConfig) Ready() bool {
 		strings.TrimSpace(c.APIBase) != ""
 }
 
+// loadGitLabE2EConfig 从环境变量和项目 URL 解析 e2e 配置。
 func loadGitLabE2EConfig(t *testing.T) gitLabE2EConfig {
 	t.Helper()
 	loadDotEnvIfExists(t)
@@ -327,6 +339,7 @@ func loadGitLabE2EConfig(t *testing.T) gitLabE2EConfig {
 	return cfg
 }
 
+// loadDotEnvIfExists 在本地存在 .env 时加载为环境变量（CI 无 .env 时自动跳过）。
 func loadDotEnvIfExists(t *testing.T) {
 	t.Helper()
 
@@ -360,6 +373,7 @@ func loadDotEnvIfExists(t *testing.T) {
 	}
 }
 
+// findFileUpwards 从当前目录向上查找指定文件。
 func findFileUpwards(name string) (string, bool, error) {
 	wd, err := os.Getwd()
 	if err != nil {
@@ -380,31 +394,37 @@ func findFileUpwards(name string) (string, bool, error) {
 	return "", false, nil
 }
 
+// gitLabE2EHelper 封装标准测试中对 GitLab API 的直接访问。
 type gitLabE2EHelper struct {
-	http *http.Client
-	cfg  gitLabE2EConfig
+	http *http.Client    // http 是 e2e 请求客户端。
+	cfg  gitLabE2EConfig // cfg 是 e2e 测试配置快照。
 }
 
+// gitLabIssueDTO 是 GitLab issue API 的最小响应结构。
 type gitLabIssueDTO struct {
-	IID    int64    `json:"iid"`
-	State  string   `json:"state"`
-	Labels []string `json:"labels"`
+	IID    int64    `json:"iid"`    // IID 是 issue 编号。
+	State  string   `json:"state"`  // State 是 issue 状态。
+	Labels []string `json:"labels"` // Labels 是 issue 标签列表。
 }
 
+// gitLabNoteDTO 是 GitLab issue note API 的最小响应结构。
 type gitLabNoteDTO struct {
-	ID   int64  `json:"id"`
-	Body string `json:"body"`
+	ID   int64  `json:"id"`   // ID 是 note 编号。
+	Body string `json:"body"` // Body 是评论正文。
 }
 
+// gitLabMRDTO 是 GitLab MR API 的最小响应结构。
 type gitLabMRDTO struct {
-	IID   int64  `json:"iid"`
-	State string `json:"state"`
+	IID   int64  `json:"iid"`   // IID 是 MR 编号。
+	State string `json:"state"` // State 是 MR 状态。
 }
 
+// gitLabProjectDTO 是 GitLab project API 的最小响应结构。
 type gitLabProjectDTO struct {
-	DefaultBranch string `json:"default_branch"`
+	DefaultBranch string `json:"default_branch"` // DefaultBranch 是项目默认分支。
 }
 
+// getDefaultBranch 查询项目默认分支。
 func (h *gitLabE2EHelper) getDefaultBranch(ctx context.Context) (string, error) {
 	var row gitLabProjectDTO
 	if err := h.doJSON(ctx, http.MethodGet, fmt.Sprintf("/projects/%s", url.PathEscape(h.cfg.ProjectID)), nil, &row); err != nil {
@@ -413,6 +433,7 @@ func (h *gitLabE2EHelper) getDefaultBranch(ctx context.Context) (string, error) 
 	return strings.TrimSpace(row.DefaultBranch), nil
 }
 
+// createIssue 在测试项目中创建临时 issue。
 func (h *gitLabE2EHelper) createIssue(ctx context.Context, title string, desc string) (int64, error) {
 	payload := map[string]any{
 		"title":       title,
@@ -425,10 +446,12 @@ func (h *gitLabE2EHelper) createIssue(ctx context.Context, title string, desc st
 	return row.IID, nil
 }
 
+// deleteIssue 删除临时 issue，供清理阶段调用。
 func (h *gitLabE2EHelper) deleteIssue(ctx context.Context, issueIID int64) error {
 	return h.doJSON(ctx, http.MethodDelete, fmt.Sprintf("/projects/%s/issues/%d", url.PathEscape(h.cfg.ProjectID), issueIID), nil, nil)
 }
 
+// getIssue 获取指定 issue 的当前状态快照。
 func (h *gitLabE2EHelper) getIssue(ctx context.Context, issueIID int64) (*gitLabIssueDTO, error) {
 	var row gitLabIssueDTO
 	if err := h.doJSON(ctx, http.MethodGet, fmt.Sprintf("/projects/%s/issues/%d", url.PathEscape(h.cfg.ProjectID), issueIID), nil, &row); err != nil {
@@ -437,6 +460,7 @@ func (h *gitLabE2EHelper) getIssue(ctx context.Context, issueIID int64) (*gitLab
 	return &row, nil
 }
 
+// listIssueNotes 拉取 issue 评论列表。
 func (h *gitLabE2EHelper) listIssueNotes(ctx context.Context, issueIID int64) ([]gitLabNoteDTO, error) {
 	var rows []gitLabNoteDTO
 	path := fmt.Sprintf(
@@ -450,6 +474,7 @@ func (h *gitLabE2EHelper) listIssueNotes(ctx context.Context, issueIID int64) ([
 	return rows, nil
 }
 
+// createBranch 基于给定 ref 创建测试分支。
 func (h *gitLabE2EHelper) createBranch(ctx context.Context, branch string, ref string) error {
 	payload := map[string]any{
 		"branch": branch,
@@ -458,6 +483,7 @@ func (h *gitLabE2EHelper) createBranch(ctx context.Context, branch string, ref s
 	return h.doJSON(ctx, http.MethodPost, fmt.Sprintf("/projects/%s/repository/branches", url.PathEscape(h.cfg.ProjectID)), payload, nil)
 }
 
+// createFile 在测试分支写入文件并提交一次 commit。
 func (h *gitLabE2EHelper) createFile(ctx context.Context, branch string, filePath string, content string, commitMessage string) error {
 	payload := map[string]any{
 		"branch":         branch,
@@ -472,11 +498,13 @@ func (h *gitLabE2EHelper) createFile(ctx context.Context, branch string, filePat
 	return h.doJSON(ctx, http.MethodPost, path, payload, nil)
 }
 
+// deleteBranch 删除测试分支。
 func (h *gitLabE2EHelper) deleteBranch(ctx context.Context, branch string) error {
 	path := fmt.Sprintf("/projects/%s/repository/branches/%s", url.PathEscape(h.cfg.ProjectID), url.PathEscape(branch))
 	return h.doJSON(ctx, http.MethodDelete, path, nil, nil)
 }
 
+// getMergeRequest 获取 MR 状态，用于合并结果断言。
 func (h *gitLabE2EHelper) getMergeRequest(ctx context.Context, mrIID int64) (*gitLabMRDTO, error) {
 	path := fmt.Sprintf("/projects/%s/merge_requests/%d", url.PathEscape(h.cfg.ProjectID), mrIID)
 	var row gitLabMRDTO
@@ -486,6 +514,7 @@ func (h *gitLabE2EHelper) getMergeRequest(ctx context.Context, mrIID int64) (*gi
 	return &row, nil
 }
 
+// doJSON 执行 GitLab JSON API 调用并解析响应。
 func (h *gitLabE2EHelper) doJSON(ctx context.Context, method string, path string, payload any, out any) error {
 	urlRaw := strings.TrimRight(h.cfg.APIBase, "/") + path
 	var body io.Reader
@@ -530,6 +559,7 @@ func (h *gitLabE2EHelper) doJSON(ctx context.Context, method string, path string
 	return nil
 }
 
+// waitFor 以固定间隔轮询检查函数，直到成功或超时。
 func waitFor(ctx context.Context, timeout time.Duration, interval time.Duration, check func() (bool, error)) error {
 	deadline := time.Now().Add(timeout)
 	for {
@@ -551,6 +581,7 @@ func waitFor(ctx context.Context, timeout time.Duration, interval time.Duration,
 	}
 }
 
+// containsLabel 判断标签列表中是否包含目标标签（忽略大小写）。
 func containsLabel(labels []string, target string) bool {
 	target = strings.TrimSpace(target)
 	for _, label := range labels {
@@ -561,6 +592,7 @@ func containsLabel(labels []string, target string) bool {
 	return false
 }
 
+// isGitLabNotFound 判断错误是否为 GitLab 404 场景。
 func isGitLabNotFound(err error) bool {
 	if err == nil {
 		return false
@@ -569,6 +601,7 @@ func isGitLabNotFound(err error) bool {
 	return strings.Contains(text, " status=404") || strings.Contains(text, " not found")
 }
 
+// truncateString 按最大长度截断字符串，避免日志过长。
 func truncateString(in string, max int) string {
 	if max <= 0 || len(in) <= max {
 		return in

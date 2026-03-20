@@ -11,7 +11,7 @@
 - `handler -> service -> dal` 单向依赖。
 - `infra` 提供外部系统实现（gitlab、git、scheduler、secret、db），由 `app` 组装注入。
 - `cmds` 仅负责命令入口，不承载业务逻辑。
-- Issue provider 密钥通过 `infra/secret` 读取（默认 env provider），项目仅保存 `credential_ref`。
+- 仓库协作平台密钥通过 `infra/secret` 读取（默认 env provider），项目仅保存 `credential_ref`。
 
 ## 目标目录结构
 
@@ -60,9 +60,11 @@
 │   │   │   └── promptstore/
 │   │   ├── git/
 │   │   │   └── client.go
-│   │   └── issuetracker/
-│   │       ├── port.go
-│   │       ├── types.go
+│   │   └── repo/
+│   │       ├── common/
+│   │       │   ├── port.go
+│   │       │   ├── types.go
+│   │       │   └── errors.go
 │   │       └── gitlab/
 │   │           ├── client.go
 │   │           └── api_types.go
@@ -94,14 +96,14 @@
   - `<workdir_root>/<project_id>/<issue_id>/agent/runs/<run_no>`
 - 推荐通过 `git worktree` 管理 `git-tree`，并在 run 结束后按策略清理 `agent/runs/<run_no>`。
 
-## Issue Tracker 抽象
+## 仓库协作平台抽象
 
-- 统一抽象放在 `internal/infra/issuetracker/port.go`。
-- GitLab 实现放在 `internal/infra/issuetracker/gitlab`。
+- 统一抽象放在 `internal/infra/repo/common/port.go`。
+- GitLab 实现放在 `internal/infra/repo/gitlab`。
 - 后续支持 GitHub 时新增同级实现目录，不改 service 层接口。
 - 轮询同步策略：仅将带 `Agent Ready` 的 issue 写入本地 `issues` 表。
 - `ProjectBinding` 中必须区分：
-  - `provider_url`：Issue Provider API endpoint
+  - `provider_url`：仓库协作平台 API endpoint
   - `repo_url`：代码仓库地址
 - 需支持项目级标签映射配置（默认值 + 覆盖）：
   - `Agent Ready`

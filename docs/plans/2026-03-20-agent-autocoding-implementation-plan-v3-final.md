@@ -33,10 +33,10 @@
   - `label_verified`
   - `label_merged`
 
-## M3 Issue Tracker 抽象与 GitLab 实现
+## M3 仓库协作平台抽象与 GitLab 实现
 
-- `infra/issuetracker/port.go` 抽象接口。
-- `infra/issuetracker/gitlab` 具体实现。
+- `infra/repo/common/port.go` 抽象接口。
+- `infra/repo/gitlab` 具体实现。
 
 ## M3.1 Agent 抽象与 Codex 实现
 

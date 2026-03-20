@@ -76,7 +76,7 @@ func TestWorker_SyncProjectIssues_E2E(t *testing.T) {
 		Scheduler: appcfg.SchedulerConfig{
 			PollIntervalSec: 30,
 		},
-		IssueProvider: appcfg.IssueProviderConfig{
+		RepoProvider: appcfg.RepoProviderConfig{
 			HTTPTimeoutSec: 30,
 		},
 		Agent: appcfg.AgentConfig{

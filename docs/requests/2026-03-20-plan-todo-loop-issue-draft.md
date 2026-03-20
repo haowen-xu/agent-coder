@@ -10,9 +10,9 @@
 
 关键现状（代码位置）：
 
-- Issue Tracker 抽象接口仅有 6 个方法，不支持“更新已有 note”。
+- 仓库协作平台抽象接口仅有 6 个方法，不支持“更新已有 note”。
   - `ListIssues / SetIssueLabels / CreateIssueNote / CloseIssue / EnsureMergeRequest / MergeMergeRequest`
-  - 见 `internal/infra/issuetracker/port.go`
+  - 见 `internal/infra/repo/common/port.go`
 - Worker 当前主循环是：`(dev|merge) -> review`。
   - 在 `executeRun` 内通过 `for step := run.LoopStep; step <= run.MaxLoopStep; step++` 执行
   - 见 `internal/service/worker/service.go`
@@ -31,7 +31,7 @@
 3. Go 主循环检查 todo 是否全部完成；未完成则继续 dev。
 4. `review` agent 检查代码与 todo，可给出新的 comment/todo-list。
 5. 若 review 给出新 todo，则继续下一轮；直到 review 不再给新 todo 才结束 run。
-6. 每次 `plan/dev/review` 产生的 comment/todo 都通过本地文件产出，由 Worker 统一上传到 issue tracker；旧 todo 的更新也要回写到 issue tracker。
+6. 每次 `plan/dev/review` 产生的 comment/todo 都通过本地文件产出，由 Worker 统一上传到仓库协作平台；旧 todo 的更新也要回写到仓库协作平台。
 
 ## 3. In Scope / Out of Scope
 
@@ -40,16 +40,16 @@ In Scope：
 - 增加 `plan` 角色（先覆盖 `run_kind=dev`）。
 - 增加本地文件协议（plan/dev/review 输入输出约定）。
 - Worker 主循环重构为“外层 plan/review，内层 dev 打钩”。
-- 扩展 Issue Tracker 接口以支持 note 更新。
+- 扩展仓库协作平台接口以支持 note 更新。
 - GitLab provider 实现 note 修改。
-- 将 todo/comment 通过 Worker 同步到 issue tracker（创建或更新）。
+- 将 todo/comment 通过 Worker 同步到仓库协作平台（创建或更新）。
 - 数据结构最小增量支持（角色枚举、note id 跟踪等）。
 
 Out of Scope（本 issue 不做）：
 
 - 复杂多人协作冲突合并策略（仅保留单 worker 主控）。
 - 跨 provider（GitHub/Jira）实现。
-- WebUI 的复杂可视化编辑器（先用已有 run_logs + issue tracker note）。
+- WebUI 的复杂可视化编辑器（先用已有 run_logs + 仓库协作平台 note）。
 
 ## 4. 关键结论
 
@@ -70,9 +70,9 @@ Out of Scope（本 issue 不做）：
 
 ## 5. 设计方案（结合当前代码）
 
-## 5.1 Issue Tracker 抽象扩展
+## 5.1 仓库协作平台抽象扩展
 
-文件：`internal/infra/issuetracker/port.go`
+文件：`internal/infra/repo/common/port.go`
 
 新增/调整：
 
@@ -156,12 +156,12 @@ for loop_step in [1..max_loop_step] {
 
   while todo 存在未完成项 {
     dev -> 修改代码 + 更新 todo 勾选
-    同步 todo 到 issue tracker（更新 canonical todo note）
+    同步 todo 到仓库协作平台（更新 canonical todo note）
     若连续无进展，判定 blocked/fail
   }
 
   review -> 输出 review comment + 可选 new_todo
-  发布 review comment 到 issue tracker
+  发布 review comment 到仓库协作平台
 
   if review 未给 new_todo {
     run succeeded
@@ -169,7 +169,7 @@ for loop_step in [1..max_loop_step] {
   }
 
   用 review new_todo 覆盖当前 todo
-  同步新 todo 到 issue tracker（更新 canonical todo note）
+  同步新 todo 到仓库协作平台（更新 canonical todo note）
 }
 
 若超过 max_loop_step 仍有 new_todo -> failed
@@ -208,10 +208,10 @@ for loop_step in [1..max_loop_step] {
 约束：
 
 - Agent 只能通过上述文件向 Worker 回传 comment/todo。
-- Worker 负责校验文件存在性、格式合法性，然后写 run_logs 并同步 issue tracker。
+- Worker 负责校验文件存在性、格式合法性，然后写 run_logs 并同步仓库协作平台。
 - Worker 不信任 agent 直接调用远端 API，统一由 Go 端执行。
 
-## 5.5 issue tracker comment/todo 同步策略
+## 5.5 仓库协作平台 comment/todo 同步策略
 
 引入“canonical todo note”：
 
@@ -272,7 +272,7 @@ for loop_step in [1..max_loop_step] {
 1. `max_loop_step` 超限：`run failed`
 2. dev 子循环连续 N 次无 todo 进展：`run failed`（避免死循环）
 3. plan/review 输出 todo 非法（无法解析 markdown checklist）：`run failed`
-4. issue tracker note 更新失败：可重试 K 次，超限 fail
+4. 仓库协作平台 note 更新失败：可重试 K 次，超限 fail
 
 ## 5.9 对现有流程的兼容
 
@@ -287,7 +287,7 @@ for loop_step in [1..max_loop_step] {
 1. `run_kind=dev` 启动后，首轮必须先执行 `plan`。
 2. 若 todo 未全部勾选，Worker 不允许进入最终成功。
 3. review 给出新 todo 时，必须进入下一轮，不得直接 `pass` 结束。
-4. issue tracker 上存在：
+4. 仓库协作平台上存在：
    - 一条持续更新的 canonical todo note
    - 每轮 plan/dev/review comment
 5. `max_loop_step` 超限时 run 必须 `failed`，issue 回退/失败状态符合现有重试策略。
@@ -308,7 +308,7 @@ for loop_step in [1..max_loop_step] {
 
 M1（接口层）：
 
-- 扩展 `issuetracker.Client` 与 GitLab client（GetIssue/CreateNote 返回值/UpdateNote）
+- 扩展 `repo/common.Client` 与 GitLab client（GetIssue/CreateNote 返回值/UpdateNote）
 
 M2（数据层）：
 

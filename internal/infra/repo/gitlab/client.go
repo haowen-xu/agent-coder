@@ -238,7 +238,7 @@ func (c *Client) token(ctx context.Context, project db.Project) (string, error) 
 	}
 	token, err := c.secret.Get(ctx, ref)
 	if err != nil {
-		return "", xerr.Infra.Wrap(err, "get issue tracker token")
+		return "", xerr.Infra.Wrap(err, "get repo provider token")
 	}
 	return strings.TrimSpace(token), nil
 }
