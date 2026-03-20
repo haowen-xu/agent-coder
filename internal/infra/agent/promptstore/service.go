@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/haowen-xu/agent-coder/internal/db"
+	"github.com/haowen-xu/agent-coder/internal/dal"
 	"github.com/haowen-xu/agent-coder/internal/infra/agent/prompts"
 	"github.com/haowen-xu/agent-coder/internal/xerr"
 )

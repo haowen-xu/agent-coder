@@ -23,3 +23,30 @@ db:
   max_idle_conns: 10
   conn_max_lifetime: 30m
   auto_migrate: true
+
+auth:
+  session_ttl: 72h
+
+work:
+  work_dir: .agent-coder/workdirs
+
+agent:
+  provider: codex
+  codex:
+    binary: codex
+    sandbox: true
+    timeout_sec: 7200
+    max_retry: 5
+    max_loop_step: 5
+
+scheduler:
+  enabled: true
+  poll_interval_sec: 30
+  run_every: 30s
+
+issue_provider:
+  http_timeout_sec: 30
+
+bootstrap:
+  admin_username: admin
+  admin_password: admin123

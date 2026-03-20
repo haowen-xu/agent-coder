@@ -1,7 +1,10 @@
 .PHONY: run tidy test webui-install webui-dev webui-build codex-plan
 
 run:
-	go run ./cmd/server --config config.yaml
+	go run ./cmd/agent-coder server --config config.yaml
+
+worker:
+	go run ./cmd/agent-coder worker --config config.yaml
 
 tidy:
 	go mod tidy

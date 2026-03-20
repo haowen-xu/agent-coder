@@ -27,46 +27,46 @@
 │   └── sync_issues.go
 ├── internal/
 │   ├── app/
+│   ├── auth/
 │   ├── config/
-│   ├── handler/
-│   │   ├── auth/
-│   │   ├── admin/
-│   │   ├── project/
-│   │   ├── board/
-│   │   └── middleware/
-│   ├── service/
-│   │   ├── auth/
-│   │   ├── user/
-│   │   ├── project/
-│   │   ├── issue/
-│   │   └── workitem/
 │   ├── dal/
-│   │   ├── model/
-│   │   ├── repo/
-│   │   ├── query/
-│   │   ├── tx/
-│   │   └── migrate/
+│   │   ├── db.go
+│   │   ├── model.go
+│   │   ├── user_repo.go
+│   │   ├── project_repo.go
+│   │   ├── issue_repo.go
+│   │   ├── run_repo.go
+│   │   └── prompt_template.go
+│   ├── handler/
+│   │   └── httpserver/
+│   │       ├── server.go
+│   │       ├── auth_handlers.go
+│   │       ├── admin_handlers.go
+│   │       ├── board_handlers.go
+│   │       ├── middleware.go
+│   │       ├── static.go
+│   │       └── static/
+│   ├── service/
+│   │   ├── core/
+│   │   │   └── service.go
+│   │   └── worker/
+│   │       └── service.go
 │   ├── infra/
-│   │   ├── db/
-│   │   ├── logger/
-│   │   ├── scheduler/
+│   │   ├── agent/
+│   │   │   ├── base/
+│   │   │   ├── codex/
+│   │   │   ├── prompts/
+│   │   │   └── promptstore/
 │   │   ├── git/
-│   │   ├── secret/
+│   │   │   └── client.go
 │   │   └── issuetracker/
 │   │       ├── port.go
-│   │       ├── factory.go
 │   │       ├── types.go
 │   │       └── gitlab/
 │   │           ├── client.go
-│   │           ├── mapper.go
 │   │           └── api_types.go
-│   ├── worker/
-│   └── transport/
-│       └── httpserver/
-│           ├── server.go
-│           ├── routes.go
-│           ├── webui_embed.go
-│           └── static/
+│   ├── logger/
+│   └── xerr/
 ├── webui/
 ├── scripts/
 └── docs/
@@ -136,7 +136,7 @@
 
 ## WebUI 挂载策略（go:embed）
 
-- `webui` 构建产物输出到 `internal/transport/httpserver/static/`。
+- `webui` 构建产物输出到 `internal/handler/httpserver/static/`。
 - Go 侧使用 `go:embed` 打包 static 目录。
 - HTTP 服务统一挂载：
   - `/api/*` -> 后端接口

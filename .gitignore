@@ -18,3 +18,7 @@ webui/dist/
 .DS_Store
 .vscode/
 .idea/
+
+# Python
+/.venv
+*.pyc

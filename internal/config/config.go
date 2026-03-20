@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/spf13/viper"
@@ -11,10 +12,16 @@ import (
 )
 
 type Config struct {
-	App    AppConfig    `mapstructure:"app"`
-	Server ServerConfig `mapstructure:"server"`
-	Log    LogConfig    `mapstructure:"log"`
-	DB     DBConfig     `mapstructure:"db"`
+	App           AppConfig           `mapstructure:"app"`
+	Server        ServerConfig        `mapstructure:"server"`
+	Log           LogConfig           `mapstructure:"log"`
+	DB            DBConfig            `mapstructure:"db"`
+	Auth          AuthConfig          `mapstructure:"auth"`
+	Work          WorkConfig          `mapstructure:"work"`
+	Agent         AgentConfig         `mapstructure:"agent"`
+	Scheduler     SchedulerConfig     `mapstructure:"scheduler"`
+	IssueProvider IssueProviderConfig `mapstructure:"issue_provider"`
+	Bootstrap     BootstrapConfig     `mapstructure:"bootstrap"`
 }
 
 type AppConfig struct {
@@ -47,6 +54,46 @@ type DBConfig struct {
 	AutoMigrate     bool   `mapstructure:"auto_migrate"`
 }
 
+type AuthConfig struct {
+	SessionTTL string `mapstructure:"session_ttl"`
+}
+
+type WorkConfig struct {
+	WorkDir string `mapstructure:"work_dir"`
+}
+
+type AgentConfig struct {
+	Provider string           `mapstructure:"provider"`
+	Codex    AgentCodexConfig `mapstructure:"codex"`
+}
+
+type AgentCodexConfig struct {
+	Binary      string `mapstructure:"binary"`
+	Sandbox     bool   `mapstructure:"sandbox"`
+	TimeoutSec  int    `mapstructure:"timeout_sec"`
+	MaxRetry    int    `mapstructure:"max_retry"`
+	MaxLoopStep int    `mapstructure:"max_loop_step"`
+}
+
+type SchedulerConfig struct {
+	Enabled         bool   `mapstructure:"enabled"`
+	PollIntervalSec int    `mapstructure:"poll_interval_sec"`
+	RunEvery        string `mapstructure:"run_every"`
+}
+
+type IssueProviderConfig struct {
+	HTTPTimeoutSec int `mapstructure:"http_timeout_sec"`
+}
+
+type BootstrapConfig struct {
+	AdminUsername string `mapstructure:"admin_username"`
+	AdminPassword string `mapstructure:"admin_password"`
+}
+
+var (
+	cfgPtr atomic.Pointer[Config]
+)
+
 func Load(path string) (*Config, error) {
 	v := viper.New()
 	setDefaults(v)
@@ -67,7 +114,20 @@ func Load(path string) (*Config, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
+
+	cfgPtr.Store(&cfg)
 	return &cfg, nil
+}
+
+func Current() *Config {
+	return cfgPtr.Load()
+}
+
+func Replace(cfg *Config) {
+	if cfg == nil {
+		return
+	}
+	cfgPtr.Store(cfg)
 }
 
 func setDefaults(v *viper.Viper) {
@@ -92,6 +152,26 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("db.max_idle_conns", 10)
 	v.SetDefault("db.conn_max_lifetime", "30m")
 	v.SetDefault("db.auto_migrate", true)
+
+	v.SetDefault("auth.session_ttl", "72h")
+
+	v.SetDefault("work.work_dir", ".agent-coder/workdirs")
+
+	v.SetDefault("agent.provider", "codex")
+	v.SetDefault("agent.codex.binary", "codex")
+	v.SetDefault("agent.codex.sandbox", true)
+	v.SetDefault("agent.codex.timeout_sec", 7200)
+	v.SetDefault("agent.codex.max_retry", 5)
+	v.SetDefault("agent.codex.max_loop_step", 5)
+
+	v.SetDefault("scheduler.enabled", true)
+	v.SetDefault("scheduler.poll_interval_sec", 30)
+	v.SetDefault("scheduler.run_every", "30s")
+
+	v.SetDefault("issue_provider.http_timeout_sec", 30)
+
+	v.SetDefault("bootstrap.admin_username", "admin")
+	v.SetDefault("bootstrap.admin_password", "admin123")
 }
 
 func (c *Config) Validate() error {
@@ -124,6 +204,27 @@ func (c *Config) Validate() error {
 	}
 	if _, err := time.ParseDuration(c.DB.ConnMaxLifetime); err != nil {
 		return xerr.Config.Wrap(err, "invalid db.conn_max_lifetime")
+	}
+	if _, err := time.ParseDuration(c.Auth.SessionTTL); err != nil {
+		return xerr.Config.Wrap(err, "invalid auth.session_ttl")
+	}
+	if strings.TrimSpace(c.Work.WorkDir) == "" {
+		return xerr.Config.New("work.work_dir is required")
+	}
+	if c.Agent.Codex.TimeoutSec <= 0 {
+		return xerr.Config.New("agent.codex.timeout_sec must be > 0")
+	}
+	if c.Agent.Codex.MaxRetry <= 0 {
+		return xerr.Config.New("agent.codex.max_retry must be > 0")
+	}
+	if c.Agent.Codex.MaxLoopStep <= 0 {
+		return xerr.Config.New("agent.codex.max_loop_step must be > 0")
+	}
+	if strings.TrimSpace(c.Bootstrap.AdminUsername) == "" {
+		return xerr.Config.New("bootstrap.admin_username is required")
+	}
+	if strings.TrimSpace(c.Bootstrap.AdminPassword) == "" {
+		return xerr.Config.New("bootstrap.admin_password is required")
 	}
 	return nil
 }
@@ -160,6 +261,22 @@ func (c *DBConfig) ConnMaxLifetimeDuration() time.Duration {
 	d, err := time.ParseDuration(c.ConnMaxLifetime)
 	if err != nil {
 		return 30 * time.Minute
+	}
+	return d
+}
+
+func (c *AuthConfig) SessionTTLDuration() time.Duration {
+	d, err := time.ParseDuration(c.SessionTTL)
+	if err != nil {
+		return 72 * time.Hour
+	}
+	return d
+}
+
+func (c *SchedulerConfig) RunEveryDuration() time.Duration {
+	d, err := time.ParseDuration(c.RunEvery)
+	if err != nil {
+		return 30 * time.Second
 	}
 	return d
 }
