@@ -219,6 +219,14 @@
                     <el-form-item label="credential_ref">
                       <el-input v-model="projectForm.credential_ref" placeholder="gitlab_demo_token" />
                     </el-form-item>
+                    <el-form-item label="project_token">
+                      <el-input
+                        v-model="projectForm.project_token"
+                        type="password"
+                        show-password
+                        placeholder="glpat-... (可选，优先于 credential_ref)"
+                      />
+                    </el-form-item>
                     <el-form-item label="poll_interval_sec">
                       <el-input-number v-model="projectForm.poll_interval_sec" :min="10" :max="3600" />
                     </el-form-item>
@@ -328,6 +336,99 @@
                 </el-card>
               </el-col>
             </el-row>
+
+            <el-row :gutter="16" class="panel-row">
+              <el-col :span="24">
+                <el-card class="admin-card" shadow="never">
+                  <template #header>
+                    <div class="panel-title">运维与日志</div>
+                  </template>
+
+                  <div class="form-inline-row mb-12">
+                    <el-select
+                      v-model="opsForm.project_key"
+                      placeholder="选择项目"
+                      filterable
+                      style="width: 260px"
+                      @change="onOpsProjectChange"
+                    >
+                      <el-option
+                        v-for="row in admin.projects"
+                        :key="row.project_key"
+                        :label="`${row.project_key} (${row.name})`"
+                        :value="row.project_key"
+                      />
+                    </el-select>
+                    <el-button :loading="admin.loading" @click="refreshOpsMetrics">刷新指标</el-button>
+                    <el-button :loading="admin.loading" @click="resetOpsProjectSyncCursor">重置同步游标</el-button>
+                    <el-input-number v-model="opsForm.issue_id" :min="1" placeholder="issue id" />
+                    <el-button :loading="admin.loading" @click="retryOpsIssue">重试 Issue</el-button>
+                    <el-button :loading="admin.loading" @click="loadOpsIssueRuns">加载 Runs</el-button>
+                    <el-input-number v-model="opsForm.run_id" :min="1" placeholder="run id" />
+                    <el-button :loading="admin.loading" @click="loadOpsRunLogs">加载 Logs</el-button>
+                  </div>
+
+                  <div class="form-inline-row mb-12">
+                    <el-input
+                      v-model="opsForm.cancel_reason"
+                      style="width: 360px"
+                      placeholder="取消 run 的原因（可选）"
+                    />
+                    <el-button type="warning" :loading="admin.loading" @click="cancelOpsRun">取消 Run</el-button>
+                  </div>
+
+                  <el-row :gutter="16">
+                    <el-col :xs="24" :lg="8">
+                      <el-card shadow="never" class="ops-sub-card">
+                        <template #header>
+                          <div class="panel-title">项目 Issues</div>
+                        </template>
+                        <el-table :data="admin.projectIssues" height="260" @row-click="onOpsIssueRowClick">
+                          <el-table-column label="ID" prop="id" width="80" />
+                          <el-table-column label="IID" prop="issue_iid" width="90" />
+                          <el-table-column label="Lifecycle" prop="lifecycle_status" min-width="140" />
+                        </el-table>
+                      </el-card>
+                    </el-col>
+                    <el-col :xs="24" :lg="8">
+                      <el-card shadow="never" class="ops-sub-card">
+                        <template #header>
+                          <div class="panel-title">Issue Runs</div>
+                        </template>
+                        <el-table :data="admin.issueRuns" height="260" @row-click="onOpsRunRowClick">
+                          <el-table-column label="RunID" prop="id" width="90" />
+                          <el-table-column label="No" prop="run_no" width="70" />
+                          <el-table-column label="Kind" prop="run_kind" width="90" />
+                          <el-table-column label="Status" prop="status" min-width="120" />
+                        </el-table>
+                      </el-card>
+                    </el-col>
+                    <el-col :xs="24" :lg="8">
+                      <el-card shadow="never" class="ops-sub-card">
+                        <template #header>
+                          <div class="panel-title">运行指标</div>
+                        </template>
+                        <el-descriptions v-if="admin.metrics" :column="1" size="small" border>
+                          <el-descriptions-item label="项目">{{ admin.metrics.projects.total }} / enabled {{ admin.metrics.projects.enabled }}</el-descriptions-item>
+                          <el-descriptions-item label="Issues">{{ admin.metrics.issues.total }}</el-descriptions-item>
+                          <el-descriptions-item label="Runs">{{ admin.metrics.runs.total }}</el-descriptions-item>
+                        </el-descriptions>
+                        <pre v-if="admin.metrics" class="metrics-json">{{ JSON.stringify(admin.metrics, null, 2) }}</pre>
+                      </el-card>
+                    </el-col>
+                  </el-row>
+
+                  <el-table :data="admin.runLogs" height="280" class="mt-12">
+                    <el-table-column label="Seq" prop="seq" width="80" />
+                    <el-table-column label="At" prop="at" width="190" />
+                    <el-table-column label="Level" prop="level" width="90" />
+                    <el-table-column label="Stage" prop="stage" width="120" />
+                    <el-table-column label="Event" prop="event_type" width="130" />
+                    <el-table-column label="Message" prop="message" min-width="260" />
+                  </el-table>
+                </el-card>
+              </el-col>
+            </el-row>
           </el-tab-pane>
         </el-tabs>
       </template>
@@ -340,6 +441,7 @@ import { ElMessage } from 'element-plus'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useBoardStore, type ProjectRow } from './stores/board'
 import {
+  type IssueRunRow,
   type PromptTemplate,
   useAdminStore,
   type AdminProjectRow,
@@ -361,6 +463,12 @@ const promptForm = reactive({
   run_kind: 'dev',
   agent_role: 'dev',
   content: '',
+})
+const opsForm = reactive({
+  project_key: '',
+  issue_id: 0,
+  run_id: 0,
+  cancel_reason: 'manual cancel',
 })
 
 const loginForm = reactive({
@@ -386,6 +494,7 @@ function defaultProjectForm(): UpsertProjectInput {
     default_branch: 'main',
     issue_project_id: '',
     credential_ref: '',
+    project_token: '',
     poll_interval_sec: 60,
     enabled: true,
     label_agent_ready: 'Agent Ready',
@@ -433,8 +542,13 @@ async function refreshAdmin() {
   await admin.fetchUsers(session.token)
   await admin.fetchProjects(session.token)
   await admin.fetchDefaultPrompts(session.token)
+  await admin.fetchMetrics(session.token)
   if (!promptForm.project_key && admin.projects.length > 0) {
     promptForm.project_key = admin.projects[0].project_key
+  }
+  if (!opsForm.project_key && admin.projects.length > 0) {
+    opsForm.project_key = admin.projects[0].project_key
+    await admin.fetchProjectIssues(session.token, opsForm.project_key, 200)
   }
   await loadProjectPrompts()
 }
@@ -573,6 +687,7 @@ function fillProjectForm(row: AdminProjectRow) {
   projectForm.default_branch = row.default_branch
   projectForm.issue_project_id = row.issue_project_id ?? ''
   projectForm.credential_ref = row.credential_ref
+  projectForm.project_token = row.project_token ?? ''
   projectForm.poll_interval_sec = row.poll_interval_sec
   projectForm.enabled = row.enabled
   projectForm.label_agent_ready = row.label_agent_ready
@@ -590,6 +705,8 @@ async function onAdminProjectRowChange(row: AdminProjectRow | null) {
   editingProjectKey.value = row.project_key
   fillProjectForm(row)
   promptForm.project_key = row.project_key
+  opsForm.project_key = row.project_key
+  await admin.fetchProjectIssues(session.token ?? '', row.project_key, 200)
   await loadProjectPrompts()
 }
 
@@ -614,6 +731,78 @@ async function saveProject() {
   if (!promptForm.project_key && admin.projects.length > 0) {
     promptForm.project_key = admin.projects[0].project_key
   }
+  if (!opsForm.project_key && admin.projects.length > 0) {
+    opsForm.project_key = admin.projects[0].project_key
+  }
+}
+
+async function onOpsProjectChange() {
+  if (!session.token || !opsForm.project_key) {
+    return
+  }
+  await admin.fetchProjectIssues(session.token, opsForm.project_key, 200)
+}
+
+function onOpsIssueRowClick(row: any) {
+  opsForm.issue_id = Number(row?.id ?? 0)
+}
+
+function onOpsRunRowClick(row: IssueRunRow) {
+  opsForm.run_id = row.id
+}
+
+async function loadOpsIssueRuns() {
+  if (!session.token || !opsForm.issue_id) {
+    ElMessage.warning('请先选择 Issue')
+    return
+  }
+  await admin.fetchIssueRuns(session.token, opsForm.issue_id, 200)
+}
+
+async function loadOpsRunLogs() {
+  if (!session.token || !opsForm.run_id) {
+    ElMessage.warning('请先选择 Run')
+    return
+  }
+  await admin.fetchRunLogs(session.token, opsForm.run_id, 1000)
+}
+
+async function retryOpsIssue() {
+  if (!session.token || !opsForm.issue_id) {
+    ElMessage.warning('请先选择 Issue')
+    return
+  }
+  await admin.retryIssue(session.token, opsForm.issue_id)
+  ElMessage.success('Issue 已重试入队')
+  await admin.fetchProjectIssues(session.token, opsForm.project_key, 200)
+}
+
+async function cancelOpsRun() {
+  if (!session.token || !opsForm.run_id) {
+    ElMessage.warning('请先选择 Run')
+    return
+  }
+  await admin.cancelRun(session.token, opsForm.run_id, opsForm.cancel_reason)
+  ElMessage.success('Run 已取消')
+  if (opsForm.issue_id) {
+    await admin.fetchIssueRuns(session.token, opsForm.issue_id, 200)
+  }
+}
+
+async function resetOpsProjectSyncCursor() {
+  if (!session.token || !opsForm.project_key) {
+    ElMessage.warning('请先选择项目')
+    return
+  }
+  await admin.resetProjectSyncCursor(session.token, opsForm.project_key)
+  ElMessage.success('项目同步游标已重置')
+}
+
+async function refreshOpsMetrics() {
+  if (!session.token) {
+    return
+  }
+  await admin.fetchMetrics(session.token)
 }
 
 onMounted(async () => {
@@ -701,6 +890,10 @@ onMounted(async () => {
   margin-bottom: 16px;
 }
 
+.ops-sub-card {
+  margin-bottom: 12px;
+}
+
 .compact-form {
   margin-bottom: 12px;
 }
@@ -727,6 +920,19 @@ onMounted(async () => {
   color: #5f6b7a;
   font-size: 12px;
   line-height: 1.4;
+}
+
+.metrics-json {
+  margin: 12px 0 0;
+  padding: 10px;
+  max-height: 220px;
+  overflow: auto;
+  border-radius: 6px;
+  background: #f6f8fb;
+  border: 1px solid #e3e8f0;
+  color: #3b4556;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .mb-12 {

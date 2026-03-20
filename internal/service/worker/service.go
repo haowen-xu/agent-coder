@@ -240,14 +240,29 @@ func (s *Service) scheduleRuns(ctx context.Context) error {
 			MaxConflictRetry: s.cfg.Agent.Codex.MaxRetry,
 		}
 		if err := s.db.CreateRun(ctx, row); err != nil {
+			if isUniqueConstraintErr(err) {
+				s.log.Warn("skip duplicated run enqueue due to concurrent scheduler",
+					slog.Uint64("issue_id", uint64(issue.ID)),
+					slog.Any("error", err),
+				)
+				continue
+			}
 			return err
 		}
 
-		issue.CurrentRunID = &row.ID
-		issue.LifecycleStatus = db.IssueLifecycleRunning
-		issue.BranchName = &row.BranchName
-		if err := s.db.SaveIssue(ctx, &issue); err != nil {
+		bound, err := s.db.BindIssueRunIfIdle(ctx, issue.ID, row.ID, row.BranchName)
+		if err != nil {
 			return err
+		}
+		if !bound {
+			now := time.Now()
+			row.Status = db.RunStatusCanceled
+			row.FinishedAt = &now
+			row.ErrorSummary = stringPtr("enqueue skipped: issue already bound by another worker")
+			if saveErr := s.db.SaveRun(ctx, row); saveErr != nil {
+				return saveErr
+			}
+			continue
 		}
 	}
 	return nil
@@ -695,6 +710,16 @@ func stringPtr(v string) *string {
 	}
 	s := v
 	return &s
+}
+
+func isUniqueConstraintErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	lower := strings.ToLower(err.Error())
+	return strings.Contains(lower, "unique constraint") ||
+		strings.Contains(lower, "duplicate key") ||
+		strings.Contains(lower, "uniq")
 }
 
 func (s *Service) markMergeFailure(

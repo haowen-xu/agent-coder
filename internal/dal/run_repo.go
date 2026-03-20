@@ -216,3 +216,45 @@ func (c *Client) CountIssueRunsByStatusAndKind(ctx context.Context, issueID uint
 	}
 	return cnt, nil
 }
+
+func (c *Client) ListRunsByIssue(ctx context.Context, issueID uint, limit int) ([]IssueRun, error) {
+	if c == nil || c.db == nil {
+		return nil, xerr.Infra.New("db is not initialized")
+	}
+	if limit <= 0 {
+		limit = 100
+	}
+	var rows []IssueRun
+	err := c.db.WithContext(ctx).
+		Where("issue_id = ?", issueID).
+		Order("id DESC").
+		Limit(limit).
+		Find(&rows).Error
+	if err != nil {
+		return nil, xerr.Infra.Wrap(err, "list runs by issue")
+	}
+	return rows, nil
+}
+
+func (c *Client) ListRunLogsByRun(ctx context.Context, runID uint, limit int) ([]RunLog, error) {
+	if c == nil || c.db == nil {
+		return nil, xerr.Infra.New("db is not initialized")
+	}
+	if limit <= 0 {
+		limit = 500
+	}
+	var rows []RunLog
+	err := c.db.WithContext(ctx).
+		Where("run_id = ?", runID).
+		Order("seq DESC").
+		Limit(limit).
+		Find(&rows).Error
+	if err != nil {
+		return nil, xerr.Infra.Wrap(err, "list run logs by run")
+	}
+	// Return in ascending seq for UI timeline.
+	for i, j := 0, len(rows)-1; i < j; i, j = i+1, j-1 {
+		rows[i], rows[j] = rows[j], rows[i]
+	}
+	return rows, nil
+}

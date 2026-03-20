@@ -179,6 +179,12 @@ func (c *Client) projectRef(project db.Project) string {
 }
 
 func (c *Client) token(ctx context.Context, project db.Project) (string, error) {
+	if project.ProjectToken != nil {
+		if token := strings.TrimSpace(*project.ProjectToken); token != "" {
+			return token, nil
+		}
+	}
+
 	ref := strings.TrimSpace(project.CredentialRef)
 	if ref == "" {
 		return "", nil

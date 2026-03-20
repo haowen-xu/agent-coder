@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"gorm.io/gorm"
 
@@ -81,4 +82,26 @@ func (c *Client) SaveProject(ctx context.Context, row *Project) error {
 		return xerr.Infra.Wrap(err, "save project")
 	}
 	return nil
+}
+
+func (c *Client) ResetProjectSyncCursorByKey(ctx context.Context, projectKey string) (*Project, error) {
+	if c == nil || c.db == nil {
+		return nil, xerr.Infra.New("db is not initialized")
+	}
+	key := strings.TrimSpace(projectKey)
+	if key == "" {
+		return nil, xerr.Config.New("project_key is required")
+	}
+	row, err := c.GetProjectByKey(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	if row == nil {
+		return nil, nil
+	}
+	row.LastIssueSyncAt = nil
+	if err := c.SaveProject(ctx, row); err != nil {
+		return nil, err
+	}
+	return row, nil
 }

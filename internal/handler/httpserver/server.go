@@ -65,11 +65,19 @@ func (s *Server) registerRoutes() {
 	admin.GET("/projects", s.adminListProjects)
 	admin.POST("/projects", s.adminCreateProject)
 	admin.PUT("/projects/:projectKey", s.adminUpdateProject)
+	admin.POST("/projects/:projectKey/reset-sync-cursor", s.adminResetProjectSyncCursor)
+	admin.GET("/projects/:projectKey/issues", s.adminProjectIssues)
 
 	admin.GET("/prompts/defaults", s.listDefaultPrompts)
 	admin.GET("/projects/:projectKey/prompts", s.listProjectPrompts)
 	admin.PUT("/projects/:projectKey/prompts/:runKind/:agentRole", s.putProjectPrompt)
 	admin.DELETE("/projects/:projectKey/prompts/:runKind/:agentRole", s.deleteProjectPrompt)
+
+	admin.GET("/issues/:issueID/runs", s.adminIssueRuns)
+	admin.POST("/issues/:issueID/retry", s.adminRetryIssue)
+	admin.GET("/runs/:runID/logs", s.adminRunLogs)
+	admin.POST("/runs/:runID/cancel", s.adminCancelRun)
+	admin.GET("/metrics", s.adminMetrics)
 
 	s.registerStaticRoutes()
 }

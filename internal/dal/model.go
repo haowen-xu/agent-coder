@@ -88,6 +88,7 @@ type Project struct {
 	DefaultBranch    string         `gorm:"size:64;not null;default:main"`
 	IssueProjectID   *string        `gorm:"size:64"`
 	CredentialRef    string         `gorm:"size:128;not null"`
+	ProjectToken     *string        `gorm:"type:text"`
 	PollIntervalSec  int            `gorm:"not null;default:60;index:idx_project_poll"`
 	Enabled          bool           `gorm:"not null;default:true;index:idx_project_poll"`
 	LastIssueSyncAt  *time.Time     `gorm:"type:timestamp"`

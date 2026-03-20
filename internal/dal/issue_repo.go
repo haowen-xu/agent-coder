@@ -129,3 +129,26 @@ func (c *Client) TouchIssueSync(ctx context.Context, issueID uint) error {
 	}
 	return nil
 }
+
+func (c *Client) BindIssueRunIfIdle(ctx context.Context, issueID uint, runID uint, branch string) (bool, error) {
+	if c == nil || c.db == nil {
+		return false, xerr.Infra.New("db is not initialized")
+	}
+	res := c.db.WithContext(ctx).Model(&Issue{}).
+		Where("id = ? AND current_run_id IS NULL AND lifecycle_status IN ?", issueID, []string{
+			IssueLifecycleRegistered,
+			IssueLifecycleRework,
+			IssueLifecycleVerified,
+		}).
+		Updates(map[string]any{
+			"current_run_id":   runID,
+			"lifecycle_status": IssueLifecycleRunning,
+			"branch_name":      branch,
+			"last_synced_at":   time.Now(),
+			"updated_at":       time.Now(),
+		})
+	if res.Error != nil {
+		return false, xerr.Infra.Wrap(res.Error, "bind issue run if idle")
+	}
+	return res.RowsAffected > 0, nil
+}

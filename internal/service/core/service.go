@@ -168,6 +168,7 @@ type ProjectUpsertInput struct {
 	DefaultBranch    string
 	IssueProjectID   *string
 	CredentialRef    string
+	ProjectToken     *string
 	PollIntervalSec  int
 	Enabled          bool
 	LabelAgentReady  string
@@ -187,6 +188,14 @@ func NormalizeProjectInput(in *ProjectUpsertInput) {
 	in.RepoURL = strings.TrimSpace(in.RepoURL)
 	in.DefaultBranch = strings.TrimSpace(in.DefaultBranch)
 	in.CredentialRef = strings.TrimSpace(in.CredentialRef)
+	if in.ProjectToken != nil {
+		v := strings.TrimSpace(*in.ProjectToken)
+		if v == "" {
+			in.ProjectToken = nil
+		} else {
+			in.ProjectToken = &v
+		}
+	}
 	if in.Provider == "" {
 		in.Provider = db.ProviderGitLab
 	}
@@ -232,8 +241,8 @@ func ValidateProjectInput(in ProjectUpsertInput) error {
 	if in.RepoURL == "" {
 		return xerr.Config.New("repo_url is required")
 	}
-	if in.CredentialRef == "" {
-		return xerr.Config.New("credential_ref is required")
+	if in.CredentialRef == "" && (in.ProjectToken == nil || strings.TrimSpace(*in.ProjectToken) == "") {
+		return xerr.Config.New("credential_ref or project_token is required")
 	}
 	return nil
 }
@@ -260,6 +269,7 @@ func (s *Service) CreateProject(ctx context.Context, createdBy uint, in ProjectU
 		DefaultBranch:    in.DefaultBranch,
 		IssueProjectID:   in.IssueProjectID,
 		CredentialRef:    in.CredentialRef,
+		ProjectToken:     in.ProjectToken,
 		PollIntervalSec:  in.PollIntervalSec,
 		Enabled:          in.Enabled,
 		LabelAgentReady:  in.LabelAgentReady,
@@ -302,6 +312,7 @@ func (s *Service) UpdateProject(ctx context.Context, projectKey string, in Proje
 	row.DefaultBranch = in.DefaultBranch
 	row.IssueProjectID = in.IssueProjectID
 	row.CredentialRef = in.CredentialRef
+	row.ProjectToken = in.ProjectToken
 	row.PollIntervalSec = in.PollIntervalSec
 	row.Enabled = in.Enabled
 	row.LabelAgentReady = in.LabelAgentReady
@@ -343,11 +354,187 @@ func (s *Service) DeleteProjectPrompt(ctx context.Context, projectKey, runKind, 
 	return s.ps.DeleteProjectOverride(ctx, projectKey, runKind, role)
 }
 
+func (s *Service) ListIssueRuns(ctx context.Context, issueID uint, limit int) ([]db.IssueRun, error) {
+	issue, err := s.db.GetIssueByID(ctx, issueID)
+	if err != nil {
+		return nil, err
+	}
+	if issue == nil {
+		return nil, xerr.Config.New("issue not found")
+	}
+	return s.db.ListRunsByIssue(ctx, issueID, limit)
+}
+
+func (s *Service) ListRunLogs(ctx context.Context, runID uint, limit int) ([]db.RunLog, error) {
+	run, err := s.db.GetRunByID(ctx, runID)
+	if err != nil {
+		return nil, err
+	}
+	if run == nil {
+		return nil, xerr.Config.New("run not found")
+	}
+	return s.db.ListRunLogsByRun(ctx, runID, limit)
+}
+
+func (s *Service) RetryIssue(ctx context.Context, issueID uint) (*db.Issue, error) {
+	issue, err := s.db.GetIssueByID(ctx, issueID)
+	if err != nil {
+		return nil, err
+	}
+	if issue == nil {
+		return nil, xerr.Config.New("issue not found")
+	}
+	if issue.LifecycleStatus == db.IssueLifecycleClosed || issue.LifecycleStatus == db.IssueLifecycleMerged {
+		return nil, xerr.Config.New("issue is already closed/merged")
+	}
+	active, err := s.db.GetActiveRunByIssue(ctx, issue.ID)
+	if err != nil {
+		return nil, err
+	}
+	if active != nil {
+		return nil, xerr.Config.New("issue has active run")
+	}
+
+	issue.CurrentRunID = nil
+	issue.LifecycleStatus = db.IssueLifecycleRegistered
+	if err := s.db.SaveIssue(ctx, issue); err != nil {
+		return nil, err
+	}
+	return issue, nil
+}
+
+func (s *Service) CancelRun(ctx context.Context, runID uint, reason string) (*db.IssueRun, error) {
+	row, err := s.db.GetRunByID(ctx, runID)
+	if err != nil {
+		return nil, err
+	}
+	if row == nil {
+		return nil, xerr.Config.New("run not found")
+	}
+	if row.Status != db.RunStatusQueued && row.Status != db.RunStatusRunning {
+		return nil, xerr.Config.New("run is not cancelable")
+	}
+	now := time.Now()
+	row.Status = db.RunStatusCanceled
+	row.FinishedAt = &now
+	if strings.TrimSpace(reason) != "" {
+		row.ErrorSummary = stringPtr("canceled by admin: " + strings.TrimSpace(reason))
+	} else {
+		row.ErrorSummary = stringPtr("canceled by admin")
+	}
+	if err := s.db.SaveRun(ctx, row); err != nil {
+		return nil, err
+	}
+
+	issue, err := s.db.GetIssueByID(ctx, row.IssueID)
+	if err != nil {
+		return nil, err
+	}
+	if issue != nil && issue.CurrentRunID != nil && *issue.CurrentRunID == row.ID {
+		issue.CurrentRunID = nil
+		switch row.RunKind {
+		case db.RunKindMerge:
+			issue.LifecycleStatus = db.IssueLifecycleVerified
+		default:
+			issue.LifecycleStatus = db.IssueLifecycleRegistered
+		}
+		if err := s.db.SaveIssue(ctx, issue); err != nil {
+			return nil, err
+		}
+	}
+	return row, nil
+}
+
+func (s *Service) ResetProjectSyncCursor(ctx context.Context, projectKey string) (*db.Project, error) {
+	row, err := s.db.ResetProjectSyncCursorByKey(ctx, projectKey)
+	if err != nil {
+		return nil, err
+	}
+	if row == nil {
+		return nil, xerr.Config.New("project not found")
+	}
+	return row, nil
+}
+
+type OpsMetrics struct {
+	Timestamp time.Time         `json:"timestamp"`
+	Projects  OpsProjectsMetric `json:"projects"`
+	Issues    OpsIssueMetric    `json:"issues"`
+	Runs      OpsRunMetric      `json:"runs"`
+}
+
+type OpsProjectsMetric struct {
+	Total   int64 `json:"total"`
+	Enabled int64 `json:"enabled"`
+}
+
+type OpsIssueMetric struct {
+	Total       int64            `json:"total"`
+	ByLifecycle map[string]int64 `json:"by_lifecycle"`
+}
+
+type OpsRunMetric struct {
+	Total    int64            `json:"total"`
+	ByStatus map[string]int64 `json:"by_status"`
+	ByKind   map[string]int64 `json:"by_kind"`
+}
+
+func (s *Service) GetOpsMetrics(ctx context.Context) (*OpsMetrics, error) {
+	projectTotal, projectEnabled, err := s.db.CountProjects(ctx)
+	if err != nil {
+		return nil, err
+	}
+	issueTotal, err := s.db.CountIssues(ctx)
+	if err != nil {
+		return nil, err
+	}
+	issueByLifecycle, err := s.db.CountIssuesByLifecycle(ctx)
+	if err != nil {
+		return nil, err
+	}
+	runTotal, err := s.db.CountRuns(ctx)
+	if err != nil {
+		return nil, err
+	}
+	runByStatus, err := s.db.CountRunsByStatus(ctx)
+	if err != nil {
+		return nil, err
+	}
+	runByKind, err := s.db.CountRunsByKind(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &OpsMetrics{
+		Timestamp: time.Now(),
+		Projects: OpsProjectsMetric{
+			Total:   projectTotal,
+			Enabled: projectEnabled,
+		},
+		Issues: OpsIssueMetric{
+			Total:       issueTotal,
+			ByLifecycle: issueByLifecycle,
+		},
+		Runs: OpsRunMetric{
+			Total:    runTotal,
+			ByStatus: runByStatus,
+			ByKind:   runByKind,
+		},
+	}, nil
+}
+
 func (s *Service) GuardAdmin(user *AuthUser) error {
 	if user == nil || !user.IsAdmin {
 		return xerr.Config.New("admin required")
 	}
 	return nil
+}
+
+func stringPtr(v string) *string {
+	if strings.TrimSpace(v) == "" {
+		return nil
+	}
+	s := strings.TrimSpace(v)
+	return &s
 }
 
 func (s *Service) Describe() string {
