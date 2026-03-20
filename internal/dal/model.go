@@ -90,6 +90,7 @@ type Project struct {
 	CredentialRef    string         `gorm:"size:128;not null"`
 	PollIntervalSec  int            `gorm:"not null;default:60;index:idx_project_poll"`
 	Enabled          bool           `gorm:"not null;default:true;index:idx_project_poll"`
+	LastIssueSyncAt  *time.Time     `gorm:"type:timestamp"`
 	LabelAgentReady  string         `gorm:"size:64;not null;default:Agent Ready"`
 	LabelInProgress  string         `gorm:"size:64;not null;default:In Progress"`
 	LabelHumanReview string         `gorm:"size:64;not null;default:Human Review"`

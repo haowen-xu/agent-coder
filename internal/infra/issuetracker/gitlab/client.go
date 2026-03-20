@@ -9,52 +9,85 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"os"
-	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/haowen-xu/agent-coder/internal/dal"
 	"github.com/haowen-xu/agent-coder/internal/infra/issuetracker"
+	"github.com/haowen-xu/agent-coder/internal/infra/secret"
 	"github.com/haowen-xu/agent-coder/internal/xerr"
 )
 
 type Client struct {
-	log  *slog.Logger
-	http *http.Client
+	log    *slog.Logger
+	http   *http.Client
+	secret secret.Manager
 }
 
-func NewClient(log *slog.Logger, timeout time.Duration) *Client {
+func NewClient(log *slog.Logger, timeout time.Duration, secretManager secret.Manager) *Client {
 	if timeout <= 0 {
 		timeout = 30 * time.Second
 	}
 	return &Client{
-		log:  log,
-		http: &http.Client{Timeout: timeout},
+		log:    log,
+		http:   &http.Client{Timeout: timeout},
+		secret: secretManager,
 	}
 }
 
-func (c *Client) ListOpenIssues(ctx context.Context, project db.Project) ([]issuetracker.Issue, error) {
-	var rows []gitLabIssue
-	endpoint := c.endpoint(project, fmt.Sprintf("/projects/%s/issues?state=opened&per_page=100", url.PathEscape(c.projectRef(project))))
-	if err := c.doJSON(ctx, project, http.MethodGet, endpoint, nil, &rows); err != nil {
-		return nil, err
+func (c *Client) ListIssues(ctx context.Context, project db.Project, opt issuetracker.ListIssuesOptions) ([]issuetracker.Issue, error) {
+	state := strings.TrimSpace(opt.State)
+	if state == "" {
+		state = "all"
+	}
+	perPage := opt.PerPage
+	if perPage <= 0 || perPage > 100 {
+		perPage = 100
+	}
+	maxPages := opt.MaxPages
+	if maxPages <= 0 {
+		maxPages = 20
 	}
 
-	out := make([]issuetracker.Issue, 0, len(rows))
-	for _, row := range rows {
-		out = append(out, issuetracker.Issue{
-			IID:       row.IID,
-			UID:       row.ID,
-			Title:     row.Title,
-			State:     row.State,
-			Labels:    row.Labels,
-			WebURL:    row.WebURL,
-			ClosedAt:  row.ClosedAt,
-			UpdatedAt: row.UpdatedAt,
-		})
+	all := make([]issuetracker.Issue, 0, perPage)
+	for page := 1; page <= maxPages; page++ {
+		values := url.Values{}
+		values.Set("state", state)
+		values.Set("per_page", strconv.Itoa(perPage))
+		values.Set("page", strconv.Itoa(page))
+		values.Set("order_by", "updated_at")
+		values.Set("sort", "asc")
+		if opt.UpdatedAfter != nil {
+			values.Set("updated_after", opt.UpdatedAfter.UTC().Format(time.RFC3339))
+		}
+
+		var rows []gitLabIssue
+		endpoint := c.endpoint(project, fmt.Sprintf(
+			"/projects/%s/issues?%s",
+			url.PathEscape(c.projectRef(project)),
+			values.Encode(),
+		))
+		if err := c.doJSON(ctx, project, http.MethodGet, endpoint, nil, &rows); err != nil {
+			return nil, err
+		}
+		for _, row := range rows {
+			all = append(all, issuetracker.Issue{
+				IID:       row.IID,
+				UID:       row.ID,
+				Title:     row.Title,
+				State:     row.State,
+				Labels:    row.Labels,
+				WebURL:    row.WebURL,
+				ClosedAt:  row.ClosedAt,
+				UpdatedAt: row.UpdatedAt,
+			})
+		}
+		if len(rows) < perPage {
+			break
+		}
 	}
-	return out, nil
+	return all, nil
 }
 
 func (c *Client) SetIssueLabels(ctx context.Context, project db.Project, issueIID int64, labels []string) error {
@@ -145,19 +178,19 @@ func (c *Client) projectRef(project db.Project) string {
 	return strings.TrimSpace(project.ProjectSlug)
 }
 
-func (c *Client) token(project db.Project) string {
+func (c *Client) token(ctx context.Context, project db.Project) (string, error) {
 	ref := strings.TrimSpace(project.CredentialRef)
 	if ref == "" {
-		return ""
+		return "", nil
 	}
-	key := "AGENT_CODER_SECRET_" + sanitizeEnvKey(ref)
-	return strings.TrimSpace(os.Getenv(key))
-}
-
-func sanitizeEnvKey(in string) string {
-	up := strings.ToUpper(strings.TrimSpace(in))
-	re := regexp.MustCompile(`[^A-Z0-9]+`)
-	return re.ReplaceAllString(up, "_")
+	if c.secret == nil {
+		return "", xerr.Infra.New("secret manager is not configured")
+	}
+	token, err := c.secret.Get(ctx, ref)
+	if err != nil {
+		return "", xerr.Infra.Wrap(err, "get issue tracker token")
+	}
+	return strings.TrimSpace(token), nil
 }
 
 func (c *Client) doJSON(
@@ -183,7 +216,10 @@ func (c *Client) doJSON(
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	token := c.token(project)
+	token, err := c.token(ctx, project)
+	if err != nil {
+		return err
+	}
 	if token != "" {
 		req.Header.Set("PRIVATE-TOKEN", token)
 	}

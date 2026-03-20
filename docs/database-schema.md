@@ -52,6 +52,7 @@
 | credential_ref | VARCHAR(128) | NOT NULL，密钥引用 |
 | poll_interval_sec | INT | NOT NULL，默认 60 |
 | enabled | BOOLEAN | NOT NULL，默认 TRUE |
+| last_issue_sync_at | TIMESTAMP NULL | 项目 issue 同步游标（`updated_after`） |
 | label_agent_ready | VARCHAR(64) | NOT NULL，默认 `Agent Ready` |
 | label_in_progress | VARCHAR(64) | NOT NULL，默认 `In Progress` |
 | label_human_review | VARCHAR(64) | NOT NULL，默认 `Human Review` |
@@ -358,7 +359,15 @@ Issue 主实体与执行门禁状态。
 - 同一 run 的 `agent_run_dir` 唯一，不复用
 - `run_logs` 与 `agent_run_dir` 一一可追溯
 
-## 6. SQLite / PostgreSQL 兼容约束
+## 6. Issue 同步游标规则
+
+- Worker 调用 issue tracker 使用：
+  - `state=all`
+  - `updated_after=projects.last_issue_sync_at`（若为空则全量首扫）
+- 同步成功后回写 `projects.last_issue_sync_at`。
+- 本地入库门禁不变：仅当远端 issue 带 `Agent Ready` 且本地不存在时创建 `issues` 记录。
+
+## 7. SQLite / PostgreSQL 兼容约束
 
 - 统一使用一套 GORM model。
 - 在 DAL 中维护 `sqlDialect`（`sqlite/postgres`）。

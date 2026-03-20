@@ -21,6 +21,7 @@ import (
 	infraGit "github.com/haowen-xu/agent-coder/internal/infra/git"
 	"github.com/haowen-xu/agent-coder/internal/infra/issuetracker"
 	"github.com/haowen-xu/agent-coder/internal/infra/issuetracker/gitlab"
+	"github.com/haowen-xu/agent-coder/internal/infra/secret"
 )
 
 type Service struct {
@@ -31,10 +32,17 @@ type Service struct {
 
 	agent      base.Client
 	git        *infraGit.Client
+	secret     secret.Manager
 	lastPolled map[uint]time.Time
 }
 
-func New(cfg *appcfg.Config, log *slog.Logger, dbClient *db.Client, ps *promptstore.Service) *Service {
+func New(
+	cfg *appcfg.Config,
+	log *slog.Logger,
+	dbClient *db.Client,
+	ps *promptstore.Service,
+	secretManager secret.Manager,
+) *Service {
 	agentClient := codex.NewClient(cfg.Agent.Codex.Binary)
 	return &Service{
 		cfg:        cfg,
@@ -43,6 +51,7 @@ func New(cfg *appcfg.Config, log *slog.Logger, dbClient *db.Client, ps *promptst
 		ps:         ps,
 		agent:      agentClient,
 		git:        infraGit.NewClient(),
+		secret:     secretManager,
 		lastPolled: make(map[uint]time.Time),
 	}
 }
@@ -106,12 +115,27 @@ func (s *Service) syncProjectIssues(ctx context.Context, project db.Project) err
 	if err != nil {
 		return err
 	}
-	issues, err := client.ListOpenIssues(ctx, project)
+	var updatedAfter *time.Time
+	if project.LastIssueSyncAt != nil && !project.LastIssueSyncAt.IsZero() {
+		t := project.LastIssueSyncAt.UTC()
+		updatedAfter = &t
+	}
+	issues, err := client.ListIssues(ctx, project, issuetracker.ListIssuesOptions{
+		State:        "all",
+		UpdatedAfter: updatedAfter,
+		PerPage:      100,
+		MaxPages:     20,
+	})
 	if err != nil {
 		return err
 	}
+	syncAt := time.Now().UTC()
+	lastIssueSyncAt := syncAt
 
 	for _, it := range issues {
+		if !it.UpdatedAt.IsZero() && it.UpdatedAt.After(lastIssueSyncAt) {
+			lastIssueSyncAt = it.UpdatedAt.UTC()
+		}
 		localIssue, err := s.db.GetIssueByProjectIID(ctx, project.ID, it.IID)
 		if err != nil {
 			return err
@@ -128,7 +152,7 @@ func (s *Service) syncProjectIssues(ctx context.Context, project db.Project) err
 				State:           it.State,
 				LabelsJSON:      string(labelsJSON),
 				RegisteredAt:    time.Now(),
-				LifecycleStatus: db.IssueLifecycleRegistered,
+				LifecycleStatus: s.mapLifecycleByLabels(db.IssueLifecycleRegistered, project, it.Labels, it.State),
 				IssueDir:        "",
 				LastSyncedAt:    time.Now(),
 				ClosedAt:        it.ClosedAt,
@@ -158,6 +182,10 @@ func (s *Service) syncProjectIssues(ctx context.Context, project db.Project) err
 		if err := s.db.SaveIssue(ctx, localIssue); err != nil {
 			return err
 		}
+	}
+	project.LastIssueSyncAt = &lastIssueSyncAt
+	if err := s.db.SaveProject(ctx, &project); err != nil {
+		return err
 	}
 	return nil
 }
@@ -363,7 +391,7 @@ func (s *Service) newIssueTrackerClient(project db.Project) (issuetracker.Client
 	switch strings.ToLower(strings.TrimSpace(project.Provider)) {
 	case "", db.ProviderGitLab:
 		timeout := time.Duration(s.cfg.IssueProvider.HTTPTimeoutSec) * time.Second
-		return gitlab.NewClient(s.log, timeout), nil
+		return gitlab.NewClient(s.log, timeout, s.secret), nil
 	default:
 		return nil, errorx.IllegalArgument.New("unsupported provider: %s", project.Provider)
 	}

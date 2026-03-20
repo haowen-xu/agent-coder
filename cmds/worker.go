@@ -26,7 +26,13 @@ func workerCmd() *cobra.Command {
 			}
 			defer func() { _ = application.Close() }()
 
-			wk := worker.New(application.Config, application.Logger, application.DB, application.PromptStore)
+			wk := worker.New(
+				application.Config,
+				application.Logger,
+				application.DB,
+				application.PromptStore,
+				application.Secret,
+			)
 
 			errCh := make(chan error, 1)
 			go func() {

@@ -9,6 +9,7 @@ import (
 	"github.com/haowen-xu/agent-coder/internal/dal"
 	"github.com/haowen-xu/agent-coder/internal/handler/httpserver"
 	"github.com/haowen-xu/agent-coder/internal/infra/agent/promptstore"
+	"github.com/haowen-xu/agent-coder/internal/infra/secret"
 	"github.com/haowen-xu/agent-coder/internal/logger"
 	"github.com/haowen-xu/agent-coder/internal/service/core"
 	"github.com/haowen-xu/agent-coder/internal/xerr"
@@ -18,6 +19,7 @@ type App struct {
 	Config      *config.Config
 	Logger      *slog.Logger
 	DB          *db.Client
+	Secret      secret.Manager
 	PromptStore *promptstore.Service
 	CoreService *core.Service
 	Server      *httpserver.Server
@@ -44,6 +46,13 @@ func New(ctx context.Context, configPath string) (*App, error) {
 		}
 	}
 
+	var secretMgr secret.Manager
+	switch strings.ToLower(strings.TrimSpace(cfg.Secret.Provider)) {
+	case "", "env":
+		secretMgr = secret.NewEnvManager(cfg.Secret.EnvPrefix)
+	default:
+		return nil, xerr.Startup.New("unsupported secret provider: %s", cfg.Secret.Provider)
+	}
 	promptService := promptstore.NewService(dbClient)
 	coreService := core.New(cfg, dbClient, promptService)
 	srv := httpserver.New(cfg, log, dbClient, coreService)
@@ -51,6 +60,7 @@ func New(ctx context.Context, configPath string) (*App, error) {
 		Config:      cfg,
 		Logger:      log,
 		DB:          dbClient,
+		Secret:      secretMgr,
 		PromptStore: promptService,
 		CoreService: coreService,
 		Server:      srv,

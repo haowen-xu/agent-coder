@@ -16,6 +16,7 @@ type Config struct {
 	Server        ServerConfig        `mapstructure:"server"`
 	Log           LogConfig           `mapstructure:"log"`
 	DB            DBConfig            `mapstructure:"db"`
+	Secret        SecretConfig        `mapstructure:"secret"`
 	Auth          AuthConfig          `mapstructure:"auth"`
 	Work          WorkConfig          `mapstructure:"work"`
 	Agent         AgentConfig         `mapstructure:"agent"`
@@ -52,6 +53,11 @@ type DBConfig struct {
 	MaxIdleConns    int    `mapstructure:"max_idle_conns"`
 	ConnMaxLifetime string `mapstructure:"conn_max_lifetime"`
 	AutoMigrate     bool   `mapstructure:"auto_migrate"`
+}
+
+type SecretConfig struct {
+	Provider  string `mapstructure:"provider"`
+	EnvPrefix string `mapstructure:"env_prefix"`
 }
 
 type AuthConfig struct {
@@ -153,6 +159,9 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("db.conn_max_lifetime", "30m")
 	v.SetDefault("db.auto_migrate", true)
 
+	v.SetDefault("secret.provider", "env")
+	v.SetDefault("secret.env_prefix", "AGENT_CODER_SECRET_")
+
 	v.SetDefault("auth.session_ttl", "72h")
 
 	v.SetDefault("work.work_dir", ".agent-coder/workdirs")
@@ -204,6 +213,9 @@ func (c *Config) Validate() error {
 	}
 	if _, err := time.ParseDuration(c.DB.ConnMaxLifetime); err != nil {
 		return xerr.Config.Wrap(err, "invalid db.conn_max_lifetime")
+	}
+	if p := strings.ToLower(strings.TrimSpace(c.Secret.Provider)); p != "" && p != "env" {
+		return xerr.Config.New("unsupported secret.provider: %s", c.Secret.Provider)
 	}
 	if _, err := time.ParseDuration(c.Auth.SessionTTL); err != nil {
 		return xerr.Config.Wrap(err, "invalid auth.session_ttl")

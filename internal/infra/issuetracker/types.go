@@ -13,6 +13,13 @@ type Issue struct {
 	UpdatedAt time.Time
 }
 
+type ListIssuesOptions struct {
+	State        string
+	UpdatedAfter *time.Time
+	PerPage      int
+	MaxPages     int
+}
+
 type MergeRequest struct {
 	IID          int64
 	WebURL       string

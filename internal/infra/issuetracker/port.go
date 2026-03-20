@@ -7,7 +7,7 @@ import (
 )
 
 type Client interface {
-	ListOpenIssues(ctx context.Context, project db.Project) ([]Issue, error)
+	ListIssues(ctx context.Context, project db.Project, opt ListIssuesOptions) ([]Issue, error)
 	SetIssueLabels(ctx context.Context, project db.Project, issueIID int64, labels []string) error
 	CreateIssueNote(ctx context.Context, project db.Project, issueIID int64, body string) error
 	CloseIssue(ctx context.Context, project db.Project, issueIID int64) error

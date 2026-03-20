@@ -24,6 +24,10 @@ db:
   conn_max_lifetime: 30m
   auto_migrate: true
 
+secret:
+  provider: env
+  env_prefix: AGENT_CODER_SECRET_
+
 auth:
   session_ttl: 72h
 

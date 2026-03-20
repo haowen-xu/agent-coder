@@ -20,7 +20,13 @@ func syncIssuesCmd() *cobra.Command {
 			}
 			defer func() { _ = application.Close() }()
 
-			wk := worker.New(application.Config, application.Logger, application.DB, application.PromptStore)
+			wk := worker.New(
+				application.Config,
+				application.Logger,
+				application.DB,
+				application.PromptStore,
+				application.Secret,
+			)
 			return wk.RunOnce(context.Background())
 		},
 	}

@@ -11,6 +11,7 @@
 - `handler -> service -> dal` 单向依赖。
 - `infra` 提供外部系统实现（gitlab、git、scheduler、secret、db），由 `app` 组装注入。
 - `cmds` 仅负责命令入口，不承载业务逻辑。
+- Issue provider 密钥通过 `infra/secret` 读取（默认 env provider），项目仅保存 `credential_ref`。
 
 ## 目标目录结构
 
