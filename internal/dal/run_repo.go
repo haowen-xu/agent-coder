@@ -89,6 +89,63 @@ func (c *Client) GetNextQueuedRun(ctx context.Context) (*IssueRun, error) {
 	return &row, nil
 }
 
+func (c *Client) ClaimNextQueuedRun(ctx context.Context) (*IssueRun, error) {
+	if c == nil || c.db == nil {
+		return nil, xerr.Infra.New("db is not initialized")
+	}
+
+	for attempt := 0; attempt < 5; attempt++ {
+		var claimed *IssueRun
+		lostRace := false
+
+		err := c.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			var row IssueRun
+			queryErr := tx.
+				Where("status = ?", RunStatusQueued).
+				Order("queued_at ASC").
+				First(&row).Error
+			if errors.Is(queryErr, gorm.ErrRecordNotFound) {
+				return nil
+			}
+			if queryErr != nil {
+				return queryErr
+			}
+
+			now := time.Now()
+			res := tx.Model(&IssueRun{}).
+				Where("id = ? AND status = ?", row.ID, RunStatusQueued).
+				Updates(map[string]any{
+					"status":     RunStatusRunning,
+					"started_at": &now,
+					"updated_at": now,
+				})
+			if res.Error != nil {
+				return res.Error
+			}
+			if res.RowsAffected == 0 {
+				lostRace = true
+				return nil
+			}
+
+			row.Status = RunStatusRunning
+			row.StartedAt = &now
+			claimed = &row
+			return nil
+		})
+		if err != nil {
+			return nil, xerr.Infra.Wrap(err, "claim next queued run")
+		}
+		if claimed != nil {
+			return claimed, nil
+		}
+		if !lostRace {
+			return nil, nil
+		}
+	}
+
+	return nil, nil
+}
+
 func (c *Client) SaveRun(ctx context.Context, row *IssueRun) error {
 	if c == nil || c.db == nil {
 		return xerr.Infra.New("db is not initialized")

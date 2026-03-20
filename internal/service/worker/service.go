@@ -96,7 +96,7 @@ func (s *Service) RunOnce(ctx context.Context) error {
 		return err
 	}
 	for i := 0; i < 20; i++ {
-		run, err := s.db.GetNextQueuedRun(ctx)
+		run, err := s.db.ClaimNextQueuedRun(ctx)
 		if err != nil {
 			return err
 		}
@@ -273,9 +273,11 @@ func (s *Service) executeRun(ctx context.Context, run *db.IssueRun) error {
 		return err
 	}
 
-	now := time.Now()
 	run.Status = db.RunStatusRunning
-	run.StartedAt = &now
+	if run.StartedAt == nil || run.StartedAt.IsZero() {
+		now := time.Now()
+		run.StartedAt = &now
+	}
 	repoPath, err := s.git.EnsureProjectRepo(ctx, s.cfg.Work.WorkDir, project.RepoURL, project.ProjectKey)
 	if err != nil {
 		return err
