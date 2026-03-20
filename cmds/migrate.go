@@ -8,6 +8,7 @@ import (
 	"github.com/haowen-xu/agent-coder/internal/app"
 )
 
+// migrateCmd 执行相关逻辑。
 func migrateCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "migrate",

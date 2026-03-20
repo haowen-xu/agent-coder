@@ -11,100 +11,114 @@ import (
 	"github.com/haowen-xu/agent-coder/internal/xerr"
 )
 
+// Config 表示数据结构定义。
 type Config struct {
-	App           AppConfig           `mapstructure:"app"`
-	Server        ServerConfig        `mapstructure:"server"`
-	Log           LogConfig           `mapstructure:"log"`
-	DB            DBConfig            `mapstructure:"db"`
-	Secret        SecretConfig        `mapstructure:"secret"`
-	Auth          AuthConfig          `mapstructure:"auth"`
-	Work          WorkConfig          `mapstructure:"work"`
-	Agent         AgentConfig         `mapstructure:"agent"`
-	Scheduler     SchedulerConfig     `mapstructure:"scheduler"`
-	RepoProvider  RepoProviderConfig  `mapstructure:"repo_provider"`
-	IssueProvider IssueProviderConfig `mapstructure:"issue_provider"`
-	Bootstrap     BootstrapConfig     `mapstructure:"bootstrap"`
+	App           AppConfig           `mapstructure:"app"`            // App 字段说明。
+	Server        ServerConfig        `mapstructure:"server"`         // Server 字段说明。
+	Log           LogConfig           `mapstructure:"log"`            // Log 字段说明。
+	DB            DBConfig            `mapstructure:"db"`             // DB 字段说明。
+	Secret        SecretConfig        `mapstructure:"secret"`         // Secret 字段说明。
+	Auth          AuthConfig          `mapstructure:"auth"`           // Auth 字段说明。
+	Work          WorkConfig          `mapstructure:"work"`           // Work 字段说明。
+	Agent         AgentConfig         `mapstructure:"agent"`          // Agent 字段说明。
+	Scheduler     SchedulerConfig     `mapstructure:"scheduler"`      // Scheduler 字段说明。
+	RepoProvider  RepoProviderConfig  `mapstructure:"repo_provider"`  // RepoProvider 字段说明。
+	IssueProvider IssueProviderConfig `mapstructure:"issue_provider"` // IssueProvider 字段说明。
+	Bootstrap     BootstrapConfig     `mapstructure:"bootstrap"`      // Bootstrap 字段说明。
 }
 
+// AppConfig 表示数据结构定义。
 type AppConfig struct {
-	Name string `mapstructure:"name"`
-	Env  string `mapstructure:"env"`
+	Name string `mapstructure:"name"` // Name 字段说明。
+	Env  string `mapstructure:"env"`  // Env 字段说明。
 }
 
+// ServerConfig 表示数据结构定义。
 type ServerConfig struct {
-	Host            string `mapstructure:"host"`
-	Port            int    `mapstructure:"port"`
-	ReadTimeout     string `mapstructure:"read_timeout"`
-	WriteTimeout    string `mapstructure:"write_timeout"`
-	ShutdownTimeout string `mapstructure:"shutdown_timeout"`
+	Host            string `mapstructure:"host"`             // Host 字段说明。
+	Port            int    `mapstructure:"port"`             // Port 字段说明。
+	ReadTimeout     string `mapstructure:"read_timeout"`     // ReadTimeout 字段说明。
+	WriteTimeout    string `mapstructure:"write_timeout"`    // WriteTimeout 字段说明。
+	ShutdownTimeout string `mapstructure:"shutdown_timeout"` // ShutdownTimeout 字段说明。
 }
 
+// LogConfig 表示数据结构定义。
 type LogConfig struct {
-	Level     string `mapstructure:"level"`
-	Format    string `mapstructure:"format"`
-	AddSource bool   `mapstructure:"add_source"`
+	Level     string `mapstructure:"level"`      // Level 字段说明。
+	Format    string `mapstructure:"format"`     // Format 字段说明。
+	AddSource bool   `mapstructure:"add_source"` // AddSource 字段说明。
 }
 
+// DBConfig 表示数据结构定义。
 type DBConfig struct {
-	Enabled         bool   `mapstructure:"enabled"`
-	Driver          string `mapstructure:"driver"`
-	SQLitePath      string `mapstructure:"sqlite_path"`
-	PostgresDSN     string `mapstructure:"postgres_dsn"`
-	MaxOpenConns    int    `mapstructure:"max_open_conns"`
-	MaxIdleConns    int    `mapstructure:"max_idle_conns"`
-	ConnMaxLifetime string `mapstructure:"conn_max_lifetime"`
-	AutoMigrate     bool   `mapstructure:"auto_migrate"`
+	Enabled         bool   `mapstructure:"enabled"`           // Enabled 字段说明。
+	Driver          string `mapstructure:"driver"`            // Driver 字段说明。
+	SQLitePath      string `mapstructure:"sqlite_path"`       // SQLitePath 字段说明。
+	PostgresDSN     string `mapstructure:"postgres_dsn"`      // PostgresDSN 字段说明。
+	MaxOpenConns    int    `mapstructure:"max_open_conns"`    // MaxOpenConns 字段说明。
+	MaxIdleConns    int    `mapstructure:"max_idle_conns"`    // MaxIdleConns 字段说明。
+	ConnMaxLifetime string `mapstructure:"conn_max_lifetime"` // ConnMaxLifetime 字段说明。
+	AutoMigrate     bool   `mapstructure:"auto_migrate"`      // AutoMigrate 字段说明。
 }
 
+// SecretConfig 表示数据结构定义。
 type SecretConfig struct {
-	Provider  string `mapstructure:"provider"`
-	EnvPrefix string `mapstructure:"env_prefix"`
+	Provider  string `mapstructure:"provider"`   // Provider 字段说明。
+	EnvPrefix string `mapstructure:"env_prefix"` // EnvPrefix 字段说明。
 }
 
+// AuthConfig 表示数据结构定义。
 type AuthConfig struct {
-	SessionTTL string `mapstructure:"session_ttl"`
+	SessionTTL string `mapstructure:"session_ttl"` // SessionTTL 字段说明。
 }
 
+// WorkConfig 表示数据结构定义。
 type WorkConfig struct {
-	WorkDir string `mapstructure:"work_dir"`
+	WorkDir string `mapstructure:"work_dir"` // WorkDir 字段说明。
 }
 
+// AgentConfig 表示数据结构定义。
 type AgentConfig struct {
-	Provider string           `mapstructure:"provider"`
-	Codex    AgentCodexConfig `mapstructure:"codex"`
+	Provider string           `mapstructure:"provider"` // Provider 字段说明。
+	Codex    AgentCodexConfig `mapstructure:"codex"`    // Codex 字段说明。
 }
 
+// AgentCodexConfig 表示数据结构定义。
 type AgentCodexConfig struct {
-	Binary      string `mapstructure:"binary"`
-	Sandbox     bool   `mapstructure:"sandbox"`
-	TimeoutSec  int    `mapstructure:"timeout_sec"`
-	MaxRetry    int    `mapstructure:"max_retry"`
-	MaxLoopStep int    `mapstructure:"max_loop_step"`
+	Binary      string `mapstructure:"binary"`        // Binary 字段说明。
+	Sandbox     bool   `mapstructure:"sandbox"`       // Sandbox 字段说明。
+	TimeoutSec  int    `mapstructure:"timeout_sec"`   // TimeoutSec 字段说明。
+	MaxRetry    int    `mapstructure:"max_retry"`     // MaxRetry 字段说明。
+	MaxLoopStep int    `mapstructure:"max_loop_step"` // MaxLoopStep 字段说明。
 }
 
+// SchedulerConfig 表示数据结构定义。
 type SchedulerConfig struct {
-	Enabled         bool   `mapstructure:"enabled"`
-	PollIntervalSec int    `mapstructure:"poll_interval_sec"`
-	RunEvery        string `mapstructure:"run_every"`
+	Enabled         bool   `mapstructure:"enabled"`           // Enabled 字段说明。
+	PollIntervalSec int    `mapstructure:"poll_interval_sec"` // PollIntervalSec 字段说明。
+	RunEvery        string `mapstructure:"run_every"`         // RunEvery 字段说明。
 }
 
+// RepoProviderConfig 表示数据结构定义。
 type RepoProviderConfig struct {
-	HTTPTimeoutSec int `mapstructure:"http_timeout_sec"`
+	HTTPTimeoutSec int `mapstructure:"http_timeout_sec"` // HTTPTimeoutSec 字段说明。
 }
 
 // IssueProviderConfig 保留兼容旧配置项 issue_provider。
 // 新配置建议使用 repo_provider。
 type IssueProviderConfig = RepoProviderConfig
 
+// BootstrapConfig 表示数据结构定义。
 type BootstrapConfig struct {
-	AdminUsername string `mapstructure:"admin_username"`
-	AdminPassword string `mapstructure:"admin_password"`
+	AdminUsername string `mapstructure:"admin_username"` // AdminUsername 字段说明。
+	AdminPassword string `mapstructure:"admin_password"` // AdminPassword 字段说明。
 }
 
 var (
 	cfgPtr atomic.Pointer[Config]
 )
 
+// Load 执行相关逻辑。
 func Load(path string) (*Config, error) {
 	v := viper.New()
 	setDefaults(v)
@@ -130,10 +144,12 @@ func Load(path string) (*Config, error) {
 	return &cfg, nil
 }
 
+// Current 执行相关逻辑。
 func Current() *Config {
 	return cfgPtr.Load()
 }
 
+// Replace 执行相关逻辑。
 func Replace(cfg *Config) {
 	if cfg == nil {
 		return
@@ -141,6 +157,7 @@ func Replace(cfg *Config) {
 	cfgPtr.Store(cfg)
 }
 
+// setDefaults 执行相关逻辑。
 func setDefaults(v *viper.Viper) {
 	v.SetDefault("app.name", "agent-coder")
 	v.SetDefault("app.env", "dev")
@@ -189,6 +206,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("bootstrap.admin_password", "admin123")
 }
 
+// Validate 是方法实现。
 func (c *Config) Validate() error {
 	driver := strings.ToLower(c.DB.Driver)
 	if c.DB.Enabled {
@@ -247,6 +265,7 @@ func (c *Config) Validate() error {
 	return nil
 }
 
+// Address 是方法实现。
 func (c *ServerConfig) Address() string {
 	return fmt.Sprintf("%s:%d", c.Host, c.Port)
 }
@@ -266,6 +285,7 @@ func (c *Config) RepoHTTPTimeoutSec() int {
 	return 30
 }
 
+// ReadTimeoutDuration 是方法实现。
 func (c *ServerConfig) ReadTimeoutDuration() time.Duration {
 	d, err := time.ParseDuration(c.ReadTimeout)
 	if err != nil {
@@ -274,6 +294,7 @@ func (c *ServerConfig) ReadTimeoutDuration() time.Duration {
 	return d
 }
 
+// WriteTimeoutDuration 是方法实现。
 func (c *ServerConfig) WriteTimeoutDuration() time.Duration {
 	d, err := time.ParseDuration(c.WriteTimeout)
 	if err != nil {
@@ -282,6 +303,7 @@ func (c *ServerConfig) WriteTimeoutDuration() time.Duration {
 	return d
 }
 
+// ShutdownTimeoutDuration 是方法实现。
 func (c *ServerConfig) ShutdownTimeoutDuration() time.Duration {
 	d, err := time.ParseDuration(c.ShutdownTimeout)
 	if err != nil {
@@ -290,6 +312,7 @@ func (c *ServerConfig) ShutdownTimeoutDuration() time.Duration {
 	return d
 }
 
+// ConnMaxLifetimeDuration 是方法实现。
 func (c *DBConfig) ConnMaxLifetimeDuration() time.Duration {
 	d, err := time.ParseDuration(c.ConnMaxLifetime)
 	if err != nil {
@@ -298,6 +321,7 @@ func (c *DBConfig) ConnMaxLifetimeDuration() time.Duration {
 	return d
 }
 
+// SessionTTLDuration 是方法实现。
 func (c *AuthConfig) SessionTTLDuration() time.Duration {
 	d, err := time.ParseDuration(c.SessionTTL)
 	if err != nil {
@@ -306,6 +330,7 @@ func (c *AuthConfig) SessionTTLDuration() time.Duration {
 	return d
 }
 
+// RunEveryDuration 是方法实现。
 func (c *SchedulerConfig) RunEveryDuration() time.Duration {
 	d, err := time.ParseDuration(c.RunEvery)
 	if err != nil {

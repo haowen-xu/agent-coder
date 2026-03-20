@@ -9,10 +9,12 @@ import (
 	"github.com/haowen-xu/agent-coder/internal/xerr"
 )
 
+// EnvManager 表示数据结构定义。
 type EnvManager struct {
-	prefix string
+	prefix string // prefix 字段说明。
 }
 
+// NewEnvManager 执行相关逻辑。
 func NewEnvManager(prefix string) *EnvManager {
 	p := strings.TrimSpace(prefix)
 	if p == "" {
@@ -21,6 +23,7 @@ func NewEnvManager(prefix string) *EnvManager {
 	return &EnvManager{prefix: p}
 }
 
+// Get 是 *EnvManager 的方法实现。
 func (m *EnvManager) Get(_ context.Context, ref string) (string, error) {
 	keyRef := strings.TrimSpace(ref)
 	if keyRef == "" {
@@ -34,6 +37,7 @@ func (m *EnvManager) Get(_ context.Context, ref string) (string, error) {
 	return val, nil
 }
 
+// sanitizeEnvKey 执行相关逻辑。
 func sanitizeEnvKey(in string) string {
 	up := strings.ToUpper(strings.TrimSpace(in))
 	re := regexp.MustCompile(`[^A-Z0-9]+`)

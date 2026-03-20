@@ -12,6 +12,7 @@ import (
 	"github.com/haowen-xu/agent-coder/internal/service/worker"
 )
 
+// workerCmd 执行相关逻辑。
 func workerCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "worker",

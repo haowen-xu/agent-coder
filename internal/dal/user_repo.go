@@ -11,6 +11,7 @@ import (
 	"github.com/haowen-xu/agent-coder/internal/xerr"
 )
 
+// GetUserByUsername 是 *Client 的方法实现。
 func (c *Client) GetUserByUsername(ctx context.Context, username string) (*User, error) {
 	if c == nil || c.db == nil {
 		return nil, xerr.Infra.New("db is not initialized")
@@ -26,6 +27,7 @@ func (c *Client) GetUserByUsername(ctx context.Context, username string) (*User,
 	return &row, nil
 }
 
+// GetUserByID 是 *Client 的方法实现。
 func (c *Client) GetUserByID(ctx context.Context, id uint) (*User, error) {
 	if c == nil || c.db == nil {
 		return nil, xerr.Infra.New("db is not initialized")
@@ -41,6 +43,7 @@ func (c *Client) GetUserByID(ctx context.Context, id uint) (*User, error) {
 	return &row, nil
 }
 
+// ListUsers 是 *Client 的方法实现。
 func (c *Client) ListUsers(ctx context.Context) ([]User, error) {
 	if c == nil || c.db == nil {
 		return nil, xerr.Infra.New("db is not initialized")
@@ -53,6 +56,7 @@ func (c *Client) ListUsers(ctx context.Context) ([]User, error) {
 	return rows, nil
 }
 
+// CreateUser 是 *Client 的方法实现。
 func (c *Client) CreateUser(ctx context.Context, row *User) error {
 	if c == nil || c.db == nil {
 		return xerr.Infra.New("db is not initialized")
@@ -63,6 +67,7 @@ func (c *Client) CreateUser(ctx context.Context, row *User) error {
 	return nil
 }
 
+// SaveUser 是 *Client 的方法实现。
 func (c *Client) SaveUser(ctx context.Context, row *User) error {
 	if c == nil || c.db == nil {
 		return xerr.Infra.New("db is not initialized")
@@ -73,6 +78,7 @@ func (c *Client) SaveUser(ctx context.Context, row *User) error {
 	return nil
 }
 
+// CreateSession 是 *Client 的方法实现。
 func (c *Client) CreateSession(ctx context.Context, row *UserSession) error {
 	if c == nil || c.db == nil {
 		return xerr.Infra.New("db is not initialized")
@@ -83,6 +89,7 @@ func (c *Client) CreateSession(ctx context.Context, row *UserSession) error {
 	return nil
 }
 
+// GetSessionWithUser 是 *Client 的方法实现。
 func (c *Client) GetSessionWithUser(ctx context.Context, token string) (*UserSession, *User, error) {
 	if c == nil || c.db == nil {
 		return nil, nil, xerr.Infra.New("db is not initialized")
@@ -110,6 +117,7 @@ func (c *Client) GetSessionWithUser(ctx context.Context, token string) (*UserSes
 	return &sess, &user, nil
 }
 
+// EnsureBootstrapAdmin 是 *Client 的方法实现。
 func (c *Client) EnsureBootstrapAdmin(ctx context.Context, username string, password string) error {
 	if c == nil || c.db == nil {
 		return xerr.Infra.New("db is not initialized")

@@ -10,6 +10,7 @@ import (
 	"github.com/haowen-xu/agent-coder/internal/xerr"
 )
 
+// ListProjects 是 *Client 的方法实现。
 func (c *Client) ListProjects(ctx context.Context) ([]Project, error) {
 	if c == nil || c.db == nil {
 		return nil, xerr.Infra.New("db is not initialized")
@@ -22,6 +23,7 @@ func (c *Client) ListProjects(ctx context.Context) ([]Project, error) {
 	return rows, nil
 }
 
+// ListEnabledProjects 是 *Client 的方法实现。
 func (c *Client) ListEnabledProjects(ctx context.Context) ([]Project, error) {
 	if c == nil || c.db == nil {
 		return nil, xerr.Infra.New("db is not initialized")
@@ -34,6 +36,7 @@ func (c *Client) ListEnabledProjects(ctx context.Context) ([]Project, error) {
 	return rows, nil
 }
 
+// GetProjectByKey 是 *Client 的方法实现。
 func (c *Client) GetProjectByKey(ctx context.Context, projectKey string) (*Project, error) {
 	if c == nil || c.db == nil {
 		return nil, xerr.Infra.New("db is not initialized")
@@ -49,6 +52,7 @@ func (c *Client) GetProjectByKey(ctx context.Context, projectKey string) (*Proje
 	return &row, nil
 }
 
+// GetProjectByID 是 *Client 的方法实现。
 func (c *Client) GetProjectByID(ctx context.Context, id uint) (*Project, error) {
 	if c == nil || c.db == nil {
 		return nil, xerr.Infra.New("db is not initialized")
@@ -64,6 +68,7 @@ func (c *Client) GetProjectByID(ctx context.Context, id uint) (*Project, error) 
 	return &row, nil
 }
 
+// CreateProject 是 *Client 的方法实现。
 func (c *Client) CreateProject(ctx context.Context, row *Project) error {
 	if c == nil || c.db == nil {
 		return xerr.Infra.New("db is not initialized")
@@ -74,6 +79,7 @@ func (c *Client) CreateProject(ctx context.Context, row *Project) error {
 	return nil
 }
 
+// SaveProject 是 *Client 的方法实现。
 func (c *Client) SaveProject(ctx context.Context, row *Project) error {
 	if c == nil || c.db == nil {
 		return xerr.Infra.New("db is not initialized")
@@ -84,6 +90,7 @@ func (c *Client) SaveProject(ctx context.Context, row *Project) error {
 	return nil
 }
 
+// ResetProjectSyncCursorByKey 是 *Client 的方法实现。
 func (c *Client) ResetProjectSyncCursorByKey(ctx context.Context, projectKey string) (*Project, error) {
 	if c == nil || c.db == nil {
 		return nil, xerr.Infra.New("db is not initialized")

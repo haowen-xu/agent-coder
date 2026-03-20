@@ -10,6 +10,7 @@ import (
 	"github.com/haowen-xu/agent-coder/internal/xerr"
 )
 
+// GetMaxRunNo 是方法实现。
 func (c *Client) GetMaxRunNo(ctx context.Context, issueID uint) (int, error) {
 	if c == nil || c.db == nil {
 		return 0, xerr.Infra.New("db is not initialized")
@@ -28,6 +29,7 @@ func (c *Client) GetMaxRunNo(ctx context.Context, issueID uint) (int, error) {
 	return row.RunNo, nil
 }
 
+// GetActiveRunByIssue 是方法实现。
 func (c *Client) GetActiveRunByIssue(ctx context.Context, issueID uint) (*IssueRun, error) {
 	if c == nil || c.db == nil {
 		return nil, xerr.Infra.New("db is not initialized")
@@ -46,6 +48,7 @@ func (c *Client) GetActiveRunByIssue(ctx context.Context, issueID uint) (*IssueR
 	return &row, nil
 }
 
+// CreateRun 是方法实现。
 func (c *Client) CreateRun(ctx context.Context, row *IssueRun) error {
 	if c == nil || c.db == nil {
 		return xerr.Infra.New("db is not initialized")
@@ -56,6 +59,7 @@ func (c *Client) CreateRun(ctx context.Context, row *IssueRun) error {
 	return nil
 }
 
+// GetRunByID 是方法实现。
 func (c *Client) GetRunByID(ctx context.Context, id uint) (*IssueRun, error) {
 	if c == nil || c.db == nil {
 		return nil, xerr.Infra.New("db is not initialized")
@@ -71,6 +75,7 @@ func (c *Client) GetRunByID(ctx context.Context, id uint) (*IssueRun, error) {
 	return &row, nil
 }
 
+// GetNextQueuedRun 是方法实现。
 func (c *Client) GetNextQueuedRun(ctx context.Context) (*IssueRun, error) {
 	if c == nil || c.db == nil {
 		return nil, xerr.Infra.New("db is not initialized")
@@ -89,6 +94,7 @@ func (c *Client) GetNextQueuedRun(ctx context.Context) (*IssueRun, error) {
 	return &row, nil
 }
 
+// ClaimNextQueuedRun 是方法实现。
 func (c *Client) ClaimNextQueuedRun(ctx context.Context) (*IssueRun, error) {
 	if c == nil || c.db == nil {
 		return nil, xerr.Infra.New("db is not initialized")
@@ -146,6 +152,7 @@ func (c *Client) ClaimNextQueuedRun(ctx context.Context) (*IssueRun, error) {
 	return nil, nil
 }
 
+// SaveRun 是方法实现。
 func (c *Client) SaveRun(ctx context.Context, row *IssueRun) error {
 	if c == nil || c.db == nil {
 		return xerr.Infra.New("db is not initialized")
@@ -156,6 +163,7 @@ func (c *Client) SaveRun(ctx context.Context, row *IssueRun) error {
 	return nil
 }
 
+// AppendRunLog 是方法实现。
 func (c *Client) AppendRunLog(ctx context.Context, row *RunLog) error {
 	if c == nil || c.db == nil {
 		return xerr.Infra.New("db is not initialized")
@@ -169,6 +177,7 @@ func (c *Client) AppendRunLog(ctx context.Context, row *RunLog) error {
 	return nil
 }
 
+// GetNextRunSeq 是方法实现。
 func (c *Client) GetNextRunSeq(ctx context.Context, runID uint) (int, error) {
 	if c == nil || c.db == nil {
 		return 0, xerr.Infra.New("db is not initialized")
@@ -187,6 +196,7 @@ func (c *Client) GetNextRunSeq(ctx context.Context, runID uint) (int, error) {
 	return row.Seq + 1, nil
 }
 
+// CountIssueRunsByStatus 是方法实现。
 func (c *Client) CountIssueRunsByStatus(ctx context.Context, issueID uint, statuses []string) (int64, error) {
 	if c == nil || c.db == nil {
 		return 0, xerr.Infra.New("db is not initialized")
@@ -202,6 +212,7 @@ func (c *Client) CountIssueRunsByStatus(ctx context.Context, issueID uint, statu
 	return cnt, nil
 }
 
+// CountIssueRunsByStatusAndKind 是方法实现。
 func (c *Client) CountIssueRunsByStatusAndKind(ctx context.Context, issueID uint, runKind string, statuses []string) (int64, error) {
 	if c == nil || c.db == nil {
 		return 0, xerr.Infra.New("db is not initialized")
@@ -217,6 +228,7 @@ func (c *Client) CountIssueRunsByStatusAndKind(ctx context.Context, issueID uint
 	return cnt, nil
 }
 
+// ListRunsByIssue 是方法实现。
 func (c *Client) ListRunsByIssue(ctx context.Context, issueID uint, limit int) ([]IssueRun, error) {
 	if c == nil || c.db == nil {
 		return nil, xerr.Infra.New("db is not initialized")
@@ -236,6 +248,7 @@ func (c *Client) ListRunsByIssue(ctx context.Context, issueID uint, limit int) (
 	return rows, nil
 }
 
+// ListRunLogsByRun 是方法实现。
 func (c *Client) ListRunLogsByRun(ctx context.Context, runID uint, limit int) ([]RunLog, error) {
 	if c == nil || c.db == nil {
 		return nil, xerr.Infra.New("db is not initialized")

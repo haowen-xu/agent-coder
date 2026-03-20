@@ -13,6 +13,7 @@ import (
 	repocommon "github.com/haowen-xu/agent-coder/internal/infra/repo/common"
 )
 
+// TestClient_ListIssues_UsesProjectTokenFirst 用于单元测试。
 func TestClient_ListIssues_UsesProjectTokenFirst(t *testing.T) {
 	t.Parallel()
 

@@ -6,11 +6,13 @@ import (
 	"github.com/haowen-xu/agent-coder/internal/xerr"
 )
 
+// metricCount 表示数据结构定义。
 type metricCount struct {
-	Name  string
-	Count int64
+	Name  string // Name 字段说明。
+	Count int64  // Count 字段说明。
 }
 
+// CountProjects 是 *Client 的方法实现。
 func (c *Client) CountProjects(ctx context.Context) (total int64, enabled int64, err error) {
 	if c == nil || c.db == nil {
 		return 0, 0, xerr.Infra.New("db is not initialized")
@@ -24,6 +26,7 @@ func (c *Client) CountProjects(ctx context.Context) (total int64, enabled int64,
 	return total, enabled, nil
 }
 
+// CountIssues 是 *Client 的方法实现。
 func (c *Client) CountIssues(ctx context.Context) (int64, error) {
 	if c == nil || c.db == nil {
 		return 0, xerr.Infra.New("db is not initialized")
@@ -35,6 +38,7 @@ func (c *Client) CountIssues(ctx context.Context) (int64, error) {
 	return total, nil
 }
 
+// CountRuns 是 *Client 的方法实现。
 func (c *Client) CountRuns(ctx context.Context) (int64, error) {
 	if c == nil || c.db == nil {
 		return 0, xerr.Infra.New("db is not initialized")
@@ -46,6 +50,7 @@ func (c *Client) CountRuns(ctx context.Context) (int64, error) {
 	return total, nil
 }
 
+// CountIssuesByLifecycle 是 *Client 的方法实现。
 func (c *Client) CountIssuesByLifecycle(ctx context.Context) (map[string]int64, error) {
 	if c == nil || c.db == nil {
 		return nil, xerr.Infra.New("db is not initialized")
@@ -65,6 +70,7 @@ func (c *Client) CountIssuesByLifecycle(ctx context.Context) (map[string]int64, 
 	return out, nil
 }
 
+// CountRunsByStatus 是 *Client 的方法实现。
 func (c *Client) CountRunsByStatus(ctx context.Context) (map[string]int64, error) {
 	if c == nil || c.db == nil {
 		return nil, xerr.Infra.New("db is not initialized")
@@ -84,6 +90,7 @@ func (c *Client) CountRunsByStatus(ctx context.Context) (map[string]int64, error
 	return out, nil
 }
 
+// CountRunsByKind 是 *Client 的方法实现。
 func (c *Client) CountRunsByKind(ctx context.Context) (map[string]int64, error) {
 	if c == nil || c.db == nil {
 		return nil, xerr.Infra.New("db is not initialized")

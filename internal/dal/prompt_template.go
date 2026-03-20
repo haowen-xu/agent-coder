@@ -9,6 +9,7 @@ import (
 	"github.com/haowen-xu/agent-coder/internal/xerr"
 )
 
+// ListPromptTemplatesByProject 是 *Client 的方法实现。
 func (c *Client) ListPromptTemplatesByProject(ctx context.Context, projectKey string) ([]PromptTemplate, error) {
 	if c == nil || c.db == nil {
 		return nil, xerr.Infra.New("db is not initialized")
@@ -25,6 +26,7 @@ func (c *Client) ListPromptTemplatesByProject(ctx context.Context, projectKey st
 	return rows, nil
 }
 
+// UpsertPromptTemplate 是 *Client 的方法实现。
 func (c *Client) UpsertPromptTemplate(
 	ctx context.Context,
 	projectKey string,
@@ -63,6 +65,7 @@ func (c *Client) UpsertPromptTemplate(
 	return &row, nil
 }
 
+// DeletePromptTemplate 是 *Client 的方法实现。
 func (c *Client) DeletePromptTemplate(
 	ctx context.Context,
 	projectKey string,

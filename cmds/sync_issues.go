@@ -9,6 +9,7 @@ import (
 	"github.com/haowen-xu/agent-coder/internal/service/worker"
 )
 
+// syncIssuesCmd 执行相关逻辑。
 func syncIssuesCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "sync-issues",

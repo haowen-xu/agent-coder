@@ -10,6 +10,7 @@ import (
 	"github.com/haowen-xu/agent-coder/internal/xerr"
 )
 
+// GetIssueByProjectIID 是 *Client 的方法实现。
 func (c *Client) GetIssueByProjectIID(ctx context.Context, projectID uint, issueIID int64) (*Issue, error) {
 	if c == nil || c.db == nil {
 		return nil, xerr.Infra.New("db is not initialized")
@@ -27,6 +28,7 @@ func (c *Client) GetIssueByProjectIID(ctx context.Context, projectID uint, issue
 	return &row, nil
 }
 
+// GetIssueByID 是 *Client 的方法实现。
 func (c *Client) GetIssueByID(ctx context.Context, issueID uint) (*Issue, error) {
 	if c == nil || c.db == nil {
 		return nil, xerr.Infra.New("db is not initialized")
@@ -42,6 +44,7 @@ func (c *Client) GetIssueByID(ctx context.Context, issueID uint) (*Issue, error)
 	return &row, nil
 }
 
+// CreateIssue 是 *Client 的方法实现。
 func (c *Client) CreateIssue(ctx context.Context, row *Issue) error {
 	if c == nil || c.db == nil {
 		return xerr.Infra.New("db is not initialized")
@@ -52,6 +55,7 @@ func (c *Client) CreateIssue(ctx context.Context, row *Issue) error {
 	return nil
 }
 
+// SaveIssue 是 *Client 的方法实现。
 func (c *Client) SaveIssue(ctx context.Context, row *Issue) error {
 	if c == nil || c.db == nil {
 		return xerr.Infra.New("db is not initialized")
@@ -62,6 +66,7 @@ func (c *Client) SaveIssue(ctx context.Context, row *Issue) error {
 	return nil
 }
 
+// ListIssuesByProject 是 *Client 的方法实现。
 func (c *Client) ListIssuesByProject(ctx context.Context, projectID uint, limit int) ([]Issue, error) {
 	if c == nil || c.db == nil {
 		return nil, xerr.Infra.New("db is not initialized")
@@ -81,6 +86,7 @@ func (c *Client) ListIssuesByProject(ctx context.Context, projectID uint, limit 
 	return rows, nil
 }
 
+// ListIssuesByLifecycle 是 *Client 的方法实现。
 func (c *Client) ListIssuesByLifecycle(ctx context.Context, status string, limit int) ([]Issue, error) {
 	if c == nil || c.db == nil {
 		return nil, xerr.Infra.New("db is not initialized")
@@ -100,6 +106,7 @@ func (c *Client) ListIssuesByLifecycle(ctx context.Context, status string, limit
 	return rows, nil
 }
 
+// ListIssuesForScheduling 是 *Client 的方法实现。
 func (c *Client) ListIssuesForScheduling(ctx context.Context, limit int) ([]Issue, error) {
 	if c == nil || c.db == nil {
 		return nil, xerr.Infra.New("db is not initialized")
@@ -119,6 +126,7 @@ func (c *Client) ListIssuesForScheduling(ctx context.Context, limit int) ([]Issu
 	return rows, nil
 }
 
+// TouchIssueSync 是 *Client 的方法实现。
 func (c *Client) TouchIssueSync(ctx context.Context, issueID uint) error {
 	if c == nil || c.db == nil {
 		return xerr.Infra.New("db is not initialized")
@@ -130,6 +138,7 @@ func (c *Client) TouchIssueSync(ctx context.Context, issueID uint) error {
 	return nil
 }
 
+// BindIssueRunIfIdle 是 *Client 的方法实现。
 func (c *Client) BindIssueRunIfIdle(ctx context.Context, issueID uint, runID uint, branch string) (bool, error) {
 	if c == nil || c.db == nil {
 		return false, xerr.Infra.New("db is not initialized")

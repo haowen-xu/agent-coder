@@ -7,8 +7,10 @@ import (
 	"time"
 )
 
+// gitLabID 定义相关类型。
 type gitLabID string
 
+// UnmarshalJSON 是 *gitLabID 的方法实现。
 func (v *gitLabID) UnmarshalJSON(data []byte) error {
 	if len(data) == 0 || string(data) == "null" {
 		*v = ""
@@ -30,21 +32,23 @@ func (v *gitLabID) UnmarshalJSON(data []byte) error {
 	return fmt.Errorf("unsupported gitlab id payload: %s", string(data))
 }
 
+// gitLabIssue 表示数据结构定义。
 type gitLabIssue struct {
-	ID        gitLabID   `json:"id"`
-	IID       int64      `json:"iid"`
-	Title     string     `json:"title"`
-	State     string     `json:"state"`
-	Labels    []string   `json:"labels"`
-	WebURL    string     `json:"web_url"`
-	ClosedAt  *time.Time `json:"closed_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
+	ID        gitLabID   `json:"id"`         // ID 字段说明。
+	IID       int64      `json:"iid"`        // IID 字段说明。
+	Title     string     `json:"title"`      // Title 字段说明。
+	State     string     `json:"state"`      // State 字段说明。
+	Labels    []string   `json:"labels"`     // Labels 字段说明。
+	WebURL    string     `json:"web_url"`    // WebURL 字段说明。
+	ClosedAt  *time.Time `json:"closed_at"`  // ClosedAt 字段说明。
+	UpdatedAt time.Time  `json:"updated_at"` // UpdatedAt 字段说明。
 }
 
+// gitLabMR 表示数据结构定义。
 type gitLabMR struct {
-	IID          int64  `json:"iid"`
-	WebURL       string `json:"web_url"`
-	SourceBranch string `json:"source_branch"`
-	TargetBranch string `json:"target_branch"`
-	State        string `json:"state"`
+	IID          int64  `json:"iid"`           // IID 字段说明。
+	WebURL       string `json:"web_url"`       // WebURL 字段说明。
+	SourceBranch string `json:"source_branch"` // SourceBranch 字段说明。
+	TargetBranch string `json:"target_branch"` // TargetBranch 字段说明。
+	State        string `json:"state"`         // State 字段说明。
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/haowen-xu/agent-coder/internal/app"
 )
 
+// main 执行相关逻辑。
 func main() {
 	configPath := flag.String("config", "config.yaml", "path to config file")
 	flag.Parse()

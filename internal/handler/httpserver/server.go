@@ -15,14 +15,16 @@ import (
 	"github.com/haowen-xu/agent-coder/internal/service/core"
 )
 
+// Server 表示数据结构定义。
 type Server struct {
-	hz  *server.Hertz
-	log *slog.Logger
-	db  *db.Client
-	cfg *appcfg.Config
-	svc *core.Service
+	hz  *server.Hertz  // hz 字段说明。
+	log *slog.Logger   // log 字段说明。
+	db  *db.Client     // db 字段说明。
+	cfg *appcfg.Config // cfg 字段说明。
+	svc *core.Service  // svc 字段说明。
 }
 
+// New 执行相关逻辑。
 func New(cfg *appcfg.Config, log *slog.Logger, dbClient *db.Client, svc *core.Service) *Server {
 	hz := server.New(
 		server.WithHostPorts(cfg.Server.Address()),
@@ -42,6 +44,7 @@ func New(cfg *appcfg.Config, log *slog.Logger, dbClient *db.Client, svc *core.Se
 	return s
 }
 
+// registerRoutes 是 *Server 的方法实现。
 func (s *Server) registerRoutes() {
 	s.hz.GET("/healthz", s.healthz)
 	s.hz.GET("/api/v1/meta", s.meta)
@@ -82,6 +85,7 @@ func (s *Server) registerRoutes() {
 	s.registerStaticRoutes()
 }
 
+// healthz 是 *Server 的方法实现。
 func (s *Server) healthz(ctx context.Context, c *app.RequestContext) {
 	dbStatus := "disabled"
 	if s.db != nil && s.db.Enabled() {
@@ -107,6 +111,7 @@ func (s *Server) healthz(ctx context.Context, c *app.RequestContext) {
 	})
 }
 
+// meta 是 *Server 的方法实现。
 func (s *Server) meta(_ context.Context, c *app.RequestContext) {
 	dialect := "disabled"
 	if s.db != nil && s.db.Enabled() {
@@ -129,11 +134,13 @@ func (s *Server) meta(_ context.Context, c *app.RequestContext) {
 	})
 }
 
+// Run 是 *Server 的方法实现。
 func (s *Server) Run() error {
 	s.log.Info("http server starting", slog.String("addr", s.cfg.Server.Address()))
 	return s.hz.Run()
 }
 
+// Shutdown 是 *Server 的方法实现。
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.log.Info("http server shutting down")
 	return s.hz.Shutdown(ctx)

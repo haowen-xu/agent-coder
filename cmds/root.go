@@ -15,6 +15,7 @@ var (
 	}
 )
 
+// Execute 执行相关逻辑。
 func Execute() {
 	rootCmd.PersistentFlags().StringVar(&configPath, "config", "config.yaml", "path to config file")
 	rootCmd.AddCommand(serverCmd())

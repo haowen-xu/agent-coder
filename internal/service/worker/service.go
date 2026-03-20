@@ -24,18 +24,19 @@ import (
 	"github.com/haowen-xu/agent-coder/internal/infra/secret"
 )
 
+// Service 表示数据结构定义。
 type Service struct {
-	cfg *appcfg.Config
-	log *slog.Logger
-	db  *db.Client
-	ps  *promptstore.Service
-
-	agent      base.Client
-	git        *infraGit.Client
-	secret     secret.Manager
-	lastPolled map[uint]time.Time
+	cfg        *appcfg.Config       // cfg 字段说明。
+	log        *slog.Logger         // log 字段说明。
+	db         *db.Client           // db 字段说明。
+	ps         *promptstore.Service // ps 字段说明。
+	agent      base.Client          // agent 字段说明。
+	git        *infraGit.Client     // git 字段说明。
+	secret     secret.Manager       // secret 字段说明。
+	lastPolled map[uint]time.Time   // lastPolled 字段说明。
 }
 
+// New 执行相关逻辑。
 func New(
 	cfg *appcfg.Config,
 	log *slog.Logger,
@@ -56,6 +57,7 @@ func New(
 	}
 }
 
+// RunLoop 是 *Service 的方法实现。
 func (s *Service) RunLoop(ctx context.Context) error {
 	if !s.cfg.Scheduler.Enabled {
 		s.log.Info("scheduler disabled, run worker once")
@@ -78,6 +80,7 @@ func (s *Service) RunLoop(ctx context.Context) error {
 	}
 }
 
+// RunOnce 是 *Service 的方法实现。
 func (s *Service) RunOnce(ctx context.Context) error {
 	projects, err := s.db.ListEnabledProjects(ctx)
 	if err != nil {
@@ -110,6 +113,7 @@ func (s *Service) RunOnce(ctx context.Context) error {
 	return nil
 }
 
+// syncProjectIssues 是 *Service 的方法实现。
 func (s *Service) syncProjectIssues(ctx context.Context, project db.Project) error {
 	client, err := s.newRepoClient(project)
 	if err != nil {
@@ -197,6 +201,7 @@ func (s *Service) syncProjectIssues(ctx context.Context, project db.Project) err
 	return nil
 }
 
+// scheduleRuns 是 *Service 的方法实现。
 func (s *Service) scheduleRuns(ctx context.Context) error {
 	issues, err := s.db.ListIssuesForScheduling(ctx, 200)
 	if err != nil {
@@ -270,6 +275,7 @@ func (s *Service) scheduleRuns(ctx context.Context) error {
 	return nil
 }
 
+// executeRun 是 *Service 的方法实现。
 func (s *Service) executeRun(ctx context.Context, run *db.IssueRun) error {
 	issue, err := s.db.GetIssueByID(ctx, run.IssueID)
 	if err != nil {
@@ -411,6 +417,7 @@ func (s *Service) executeRun(ctx context.Context, run *db.IssueRun) error {
 	return s.finalizeIssue(ctx, repoClient, *project, issue, run, failed, lastErr)
 }
 
+// newRepoClient 是 *Service 的方法实现。
 func (s *Service) newRepoClient(project db.Project) (repocommon.Client, error) {
 	switch strings.ToLower(strings.TrimSpace(project.Provider)) {
 	case "", db.ProviderGitLab:
@@ -421,6 +428,7 @@ func (s *Service) newRepoClient(project db.Project) (repocommon.Client, error) {
 	}
 }
 
+// finalizeIssue 是 *Service 的方法实现。
 func (s *Service) finalizeIssue(
 	ctx context.Context,
 	repoClient repocommon.Client,
@@ -508,6 +516,7 @@ func (s *Service) finalizeIssue(
 	return s.db.SaveIssue(ctx, issue)
 }
 
+// buildMRReadyNote 执行相关逻辑。
 func buildMRReadyNote(
 	issueIID int64,
 	sourceBranch string,
@@ -552,6 +561,7 @@ func buildMRReadyNote(
 	)
 }
 
+// invokeRole 是 *Service 的方法实现。
 func (s *Service) invokeRole(
 	ctx context.Context,
 	project db.Project,
@@ -575,6 +585,7 @@ func (s *Service) invokeRole(
 	})
 }
 
+// loadPrompt 是 *Service 的方法实现。
 func (s *Service) loadPrompt(ctx context.Context, projectKey, runKind, role string) (string, error) {
 	templates, err := s.ps.ListEffectiveByProject(ctx, projectKey)
 	if err != nil {
@@ -588,6 +599,7 @@ func (s *Service) loadPrompt(ctx context.Context, projectKey, runKind, role stri
 	return "", fmt.Errorf("no prompt found for %s/%s", runKind, role)
 }
 
+// composePrompt 是 *Service 的方法实现。
 func (s *Service) composePrompt(
 	rolePrompt string,
 	project db.Project,
@@ -630,6 +642,7 @@ func (s *Service) composePrompt(
 	)
 }
 
+// appendDecisionLog 是 *Service 的方法实现。
 func (s *Service) appendDecisionLog(ctx context.Context, runID uint, stage string, eventType string, decision base.Decision) error {
 	seq, err := s.db.GetNextRunSeq(ctx, runID)
 	if err != nil {
@@ -650,6 +663,7 @@ func (s *Service) appendDecisionLog(ctx context.Context, runID uint, stage strin
 	return s.db.AppendRunLog(ctx, row)
 }
 
+// initialRole 执行相关逻辑。
 func initialRole(runKind string) string {
 	if runKind == db.RunKindMerge {
 		return db.AgentRoleMerge
@@ -657,6 +671,7 @@ func initialRole(runKind string) string {
 	return db.AgentRoleDev
 }
 
+// containsLabel 执行相关逻辑。
 func containsLabel(labels []string, target string) bool {
 	target = strings.TrimSpace(target)
 	if target == "" {
@@ -670,6 +685,7 @@ func containsLabel(labels []string, target string) bool {
 	return false
 }
 
+// shouldPollProject 是 *Service 的方法实现。
 func (s *Service) shouldPollProject(project db.Project) bool {
 	if project.PollIntervalSec <= 0 {
 		project.PollIntervalSec = s.cfg.Scheduler.PollIntervalSec
@@ -681,6 +697,7 @@ func (s *Service) shouldPollProject(project db.Project) bool {
 	return time.Since(last) >= time.Duration(project.PollIntervalSec)*time.Second
 }
 
+// mapLifecycleByRemote 是 *Service 的方法实现。
 func (s *Service) mapLifecycleByRemote(
 	current string,
 	currentCloseReason *string,
@@ -718,6 +735,7 @@ func (s *Service) mapLifecycleByRemote(
 	return current, nil
 }
 
+// autoCommitAndPush 是 *Service 的方法实现。
 func (s *Service) autoCommitAndPush(ctx context.Context, issue *db.Issue, run *db.IssueRun) error {
 	changed, err := s.git.HasChanges(ctx, run.GitTreePath)
 	if err != nil {
@@ -733,6 +751,7 @@ func (s *Service) autoCommitAndPush(ctx context.Context, issue *db.Issue, run *d
 	return s.git.PushBranch(ctx, run.GitTreePath, run.BranchName)
 }
 
+// stringPtr 执行相关逻辑。
 func stringPtr(v string) *string {
 	if strings.TrimSpace(v) == "" {
 		return nil
@@ -741,6 +760,7 @@ func stringPtr(v string) *string {
 	return &s
 }
 
+// isUniqueConstraintErr 执行相关逻辑。
 func isUniqueConstraintErr(err error) bool {
 	if err == nil {
 		return false
@@ -751,6 +771,7 @@ func isUniqueConstraintErr(err error) bool {
 		strings.Contains(lower, "uniq")
 }
 
+// markMergeFailure 是 *Service 的方法实现。
 func (s *Service) markMergeFailure(
 	ctx context.Context,
 	repoClient repocommon.Client,
@@ -774,6 +795,7 @@ func (s *Service) markMergeFailure(
 	return s.db.SaveIssue(ctx, issue)
 }
 
+// issueRootDir 是 *Service 的方法实现。
 func (s *Service) issueRootDir(projectID uint, issueID uint) string {
 	return filepath.Join(
 		s.cfg.Work.WorkDir,

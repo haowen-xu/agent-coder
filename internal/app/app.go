@@ -15,16 +15,18 @@ import (
 	"github.com/haowen-xu/agent-coder/internal/xerr"
 )
 
+// App 表示数据结构定义。
 type App struct {
-	Config      *config.Config
-	Logger      *slog.Logger
-	DB          *db.Client
-	Secret      secret.Manager
-	PromptStore *promptstore.Service
-	CoreService *core.Service
-	Server      *httpserver.Server
+	Config      *config.Config       // Config 字段说明。
+	Logger      *slog.Logger         // Logger 字段说明。
+	DB          *db.Client           // DB 字段说明。
+	Secret      secret.Manager       // Secret 字段说明。
+	PromptStore *promptstore.Service // PromptStore 字段说明。
+	CoreService *core.Service        // CoreService 字段说明。
+	Server      *httpserver.Server   // Server 字段说明。
 }
 
+// New 执行相关逻辑。
 func New(ctx context.Context, configPath string) (*App, error) {
 	cfg, err := config.Load(configPath)
 	if err != nil {
@@ -67,6 +69,7 @@ func New(ctx context.Context, configPath string) (*App, error) {
 	}, nil
 }
 
+// Close 是 *App 的方法实现。
 func (a *App) Close() error {
 	if a == nil || a.DB == nil {
 		return nil

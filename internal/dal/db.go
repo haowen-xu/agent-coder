@@ -15,12 +15,14 @@ import (
 	"github.com/haowen-xu/agent-coder/internal/xerr"
 )
 
+// Client 表示数据结构定义。
 type Client struct {
-	db      *gorm.DB
-	enabled bool
-	dialect string
+	db      *gorm.DB // db 字段说明。
+	enabled bool     // enabled 字段说明。
+	dialect string   // dialect 字段说明。
 }
 
+// New 执行相关逻辑。
 func New(ctx context.Context, cfg config.DBConfig, log *slog.Logger) (*Client, error) {
 	if !cfg.Enabled {
 		log.Warn("database disabled")
@@ -74,6 +76,7 @@ func New(ctx context.Context, cfg config.DBConfig, log *slog.Logger) (*Client, e
 	return client, nil
 }
 
+// buildDialector 执行相关逻辑。
 func buildDialector(cfg config.DBConfig) (gorm.Dialector, string, error) {
 	switch strings.ToLower(cfg.Driver) {
 	case "sqlite":
@@ -88,10 +91,12 @@ func buildDialector(cfg config.DBConfig) (gorm.Dialector, string, error) {
 	}
 }
 
+// Enabled 是 *Client 的方法实现。
 func (c *Client) Enabled() bool {
 	return c != nil && c.enabled
 }
 
+// Dialect 是 *Client 的方法实现。
 func (c *Client) Dialect() string {
 	if c == nil {
 		return ""
@@ -99,6 +104,7 @@ func (c *Client) Dialect() string {
 	return c.dialect
 }
 
+// DB 是 *Client 的方法实现。
 func (c *Client) DB() *gorm.DB {
 	if c == nil {
 		return nil
@@ -106,6 +112,7 @@ func (c *Client) DB() *gorm.DB {
 	return c.db
 }
 
+// SQLDB 是 *Client 的方法实现。
 func (c *Client) SQLDB() *sql.DB {
 	if c == nil || c.db == nil {
 		return nil
@@ -117,6 +124,7 @@ func (c *Client) SQLDB() *sql.DB {
 	return sqlDB
 }
 
+// Close 是 *Client 的方法实现。
 func (c *Client) Close() error {
 	sqlDB := c.SQLDB()
 	if sqlDB == nil {

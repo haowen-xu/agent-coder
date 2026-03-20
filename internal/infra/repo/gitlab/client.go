@@ -19,12 +19,14 @@ import (
 	"github.com/haowen-xu/agent-coder/internal/xerr"
 )
 
+// Client 表示数据结构定义。
 type Client struct {
-	log    *slog.Logger
-	http   *http.Client
-	secret secret.Manager
+	log    *slog.Logger   // log 字段说明。
+	http   *http.Client   // http 字段说明。
+	secret secret.Manager // secret 字段说明。
 }
 
+// NewClient 执行相关逻辑。
 func NewClient(log *slog.Logger, timeout time.Duration, secretManager secret.Manager) *Client {
 	if timeout <= 0 {
 		timeout = 30 * time.Second
@@ -36,6 +38,7 @@ func NewClient(log *slog.Logger, timeout time.Duration, secretManager secret.Man
 	}
 }
 
+// ListIssues 是 *Client 的方法实现。
 func (c *Client) ListIssues(ctx context.Context, project db.Project, opt repocommon.ListIssuesOptions) ([]repocommon.Issue, error) {
 	state := strings.TrimSpace(opt.State)
 	if state == "" {
@@ -90,6 +93,7 @@ func (c *Client) ListIssues(ctx context.Context, project db.Project, opt repocom
 	return all, nil
 }
 
+// SetIssueLabels 是 *Client 的方法实现。
 func (c *Client) SetIssueLabels(ctx context.Context, project db.Project, issueIID int64, labels []string) error {
 	endpoint := c.endpoint(project, fmt.Sprintf("/projects/%s/issues/%d", url.PathEscape(c.projectRef(project)), issueIID))
 	body := map[string]any{
@@ -98,6 +102,7 @@ func (c *Client) SetIssueLabels(ctx context.Context, project db.Project, issueII
 	return c.doJSON(ctx, project, http.MethodPut, endpoint, body, nil)
 }
 
+// CreateIssueNote 是 *Client 的方法实现。
 func (c *Client) CreateIssueNote(ctx context.Context, project db.Project, issueIID int64, body string) error {
 	endpoint := c.endpoint(project, fmt.Sprintf("/projects/%s/issues/%d/notes", url.PathEscape(c.projectRef(project)), issueIID))
 	payload := map[string]any{
@@ -106,6 +111,7 @@ func (c *Client) CreateIssueNote(ctx context.Context, project db.Project, issueI
 	return c.doJSON(ctx, project, http.MethodPost, endpoint, payload, nil)
 }
 
+// CloseIssue 是 *Client 的方法实现。
 func (c *Client) CloseIssue(ctx context.Context, project db.Project, issueIID int64) error {
 	endpoint := c.endpoint(project, fmt.Sprintf("/projects/%s/issues/%d", url.PathEscape(c.projectRef(project)), issueIID))
 	body := map[string]any{
@@ -114,6 +120,7 @@ func (c *Client) CloseIssue(ctx context.Context, project db.Project, issueIID in
 	return c.doJSON(ctx, project, http.MethodPut, endpoint, body, nil)
 }
 
+// EnsureMergeRequest 是 *Client 的方法实现。
 func (c *Client) EnsureMergeRequest(
 	ctx context.Context,
 	project db.Project,
@@ -161,6 +168,7 @@ func (c *Client) EnsureMergeRequest(
 	}, nil
 }
 
+// MergeMergeRequest 是 *Client 的方法实现。
 func (c *Client) MergeMergeRequest(ctx context.Context, project db.Project, mrIID int64) error {
 	endpoint := c.endpoint(project, fmt.Sprintf("/projects/%s/merge_requests/%d/merge", url.PathEscape(c.projectRef(project)), mrIID))
 	raw, err := json.Marshal(map[string]any{})
@@ -210,11 +218,13 @@ func (c *Client) MergeMergeRequest(ctx context.Context, project db.Project, mrII
 	return xerr.Infra.New("gitlab api PUT %s failed with status=%d", endpoint, resp.StatusCode)
 }
 
+// endpoint 是 *Client 的方法实现。
 func (c *Client) endpoint(project db.Project, p string) string {
 	base := strings.TrimRight(strings.TrimSpace(project.ProviderURL), "/")
 	return base + p
 }
 
+// projectRef 是 *Client 的方法实现。
 func (c *Client) projectRef(project db.Project) string {
 	if project.IssueProjectID != nil && strings.TrimSpace(*project.IssueProjectID) != "" {
 		return strings.TrimSpace(*project.IssueProjectID)
@@ -222,6 +232,7 @@ func (c *Client) projectRef(project db.Project) string {
 	return strings.TrimSpace(project.ProjectSlug)
 }
 
+// token 是 *Client 的方法实现。
 func (c *Client) token(ctx context.Context, project db.Project) (string, error) {
 	if project.ProjectToken != nil {
 		if token := strings.TrimSpace(*project.ProjectToken); token != "" {
@@ -243,6 +254,7 @@ func (c *Client) token(ctx context.Context, project db.Project) (string, error) 
 	return strings.TrimSpace(token), nil
 }
 
+// doJSON 是 *Client 的方法实现。
 func (c *Client) doJSON(
 	ctx context.Context,
 	project db.Project,
@@ -305,6 +317,7 @@ func (c *Client) doJSON(
 	return nil
 }
 
+// truncate 执行相关逻辑。
 func truncate(in string, max int) string {
 	if len(in) <= max {
 		return in
@@ -312,6 +325,7 @@ func truncate(in string, max int) string {
 	return in[:max]
 }
 
+// shouldNeedHumanMerge 执行相关逻辑。
 func shouldNeedHumanMerge(status int) bool {
 	switch status {
 	case http.StatusMethodNotAllowed, http.StatusNotAcceptable, http.StatusConflict, http.StatusUnprocessableEntity:

@@ -12,12 +12,15 @@ import (
 	"github.com/haowen-xu/agent-coder/internal/xerr"
 )
 
+// Client 表示数据结构定义。
 type Client struct{}
 
+// NewClient 执行相关逻辑。
 func NewClient() *Client {
 	return &Client{}
 }
 
+// EnsureProjectRepo 是 *Client 的方法实现。
 func (c *Client) EnsureProjectRepo(ctx context.Context, repoRoot string, repoURL string, projectKey string) (string, error) {
 	projectKey = sanitizePathPart(projectKey)
 	repoPath := filepath.Join(repoRoot, "_repos", projectKey)
@@ -37,6 +40,7 @@ func (c *Client) EnsureProjectRepo(ctx context.Context, repoRoot string, repoURL
 	return repoPath, nil
 }
 
+// EnsureIssueWorktree 是 *Client 的方法实现。
 func (c *Client) EnsureIssueWorktree(
 	ctx context.Context,
 	repoPath string,
@@ -69,6 +73,7 @@ func (c *Client) EnsureIssueWorktree(
 	return nil
 }
 
+// TryMergeDefault 是 *Client 的方法实现。
 func (c *Client) TryMergeDefault(ctx context.Context, worktreePath string, defaultBranch string) (bool, string, error) {
 	if _, err := c.run(ctx, worktreePath, "fetch", "origin", "--prune"); err != nil {
 		return false, "", err
@@ -83,6 +88,7 @@ func (c *Client) TryMergeDefault(ctx context.Context, worktreePath string, defau
 	return false, out, nil
 }
 
+// HasChanges 是 *Client 的方法实现。
 func (c *Client) HasChanges(ctx context.Context, worktreePath string) (bool, error) {
 	out, err := c.run(ctx, worktreePath, "status", "--porcelain")
 	if err != nil {
@@ -91,6 +97,7 @@ func (c *Client) HasChanges(ctx context.Context, worktreePath string) (bool, err
 	return strings.TrimSpace(out) != "", nil
 }
 
+// CommitAll 是 *Client 的方法实现。
 func (c *Client) CommitAll(ctx context.Context, worktreePath string, message string) error {
 	if _, err := c.run(ctx, worktreePath, "add", "-A"); err != nil {
 		return err
@@ -105,11 +112,13 @@ func (c *Client) CommitAll(ctx context.Context, worktreePath string, message str
 	return nil
 }
 
+// PushBranch 是 *Client 的方法实现。
 func (c *Client) PushBranch(ctx context.Context, worktreePath string, branch string) error {
 	_, err := c.run(ctx, worktreePath, "push", "-u", "origin", branch)
 	return err
 }
 
+// run 是 *Client 的方法实现。
 func (c *Client) run(ctx context.Context, dir string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", args...)
 	if dir != "" {
@@ -129,6 +138,7 @@ func (c *Client) run(ctx context.Context, dir string, args ...string) (string, e
 	return strings.TrimSpace(stdout.String() + "\n" + stderr.String()), nil
 }
 
+// remoteBranchExists 是 *Client 的方法实现。
 func (c *Client) remoteBranchExists(ctx context.Context, repoPath string, branch string) (bool, error) {
 	out, err := c.run(ctx, repoPath, "ls-remote", "--heads", "origin", branch)
 	if err != nil {
@@ -137,6 +147,7 @@ func (c *Client) remoteBranchExists(ctx context.Context, repoPath string, branch
 	return strings.TrimSpace(out) != "", nil
 }
 
+// sanitizePathPart 执行相关逻辑。
 func sanitizePathPart(v string) string {
 	v = strings.TrimSpace(v)
 	if v == "" {

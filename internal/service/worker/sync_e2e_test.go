@@ -22,6 +22,7 @@ const (
 	e2eGitLabToken     = "glpat-p2hVy2Z6AyoMGjAJwbyeXG86MQp1OjFrCA.01.0y0sz78gm"
 )
 
+// TestWorker_SyncProjectIssues_E2E 用于单元测试。
 func TestWorker_SyncProjectIssues_E2E(t *testing.T) {
 	ctx := context.Background()
 	workDir := t.TempDir()

@@ -14,10 +14,12 @@ import (
 //go:embed static/**/*
 var webuiFS embed.FS
 
+// registerStaticRoutes 是方法实现。
 func (s *Server) registerStaticRoutes() {
 	s.hz.NoRoute(s.handleNoRoute)
 }
 
+// handleNoRoute 是方法实现。
 func (s *Server) handleNoRoute(_ context.Context, c *app.RequestContext) {
 	p := string(c.Path())
 	if strings.HasPrefix(p, "/api/") {
@@ -27,6 +29,7 @@ func (s *Server) handleNoRoute(_ context.Context, c *app.RequestContext) {
 	s.serveSPA(c, p)
 }
 
+// serveSPA 是方法实现。
 func (s *Server) serveSPA(c *app.RequestContext, rawPath string) {
 	target := strings.TrimSpace(rawPath)
 	if target == "" || target == "/" {

@@ -8,6 +8,7 @@ import (
 	"github.com/haowen-xu/agent-coder/internal/config"
 )
 
+// New 执行相关逻辑。
 func New(cfg config.LogConfig) *slog.Logger {
 	level := parseLevel(cfg.Level)
 	opts := &slog.HandlerOptions{
@@ -20,6 +21,7 @@ func New(cfg config.LogConfig) *slog.Logger {
 	return slog.New(slog.NewTextHandler(os.Stdout, opts))
 }
 
+// parseLevel 执行相关逻辑。
 func parseLevel(s string) slog.Level {
 	switch strings.ToLower(s) {
 	case "debug":

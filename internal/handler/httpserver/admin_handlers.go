@@ -14,19 +14,22 @@ import (
 	coresvc "github.com/haowen-xu/agent-coder/internal/service/core"
 )
 
+// adminCreateUserRequest 表示数据结构定义。
 type adminCreateUserRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	IsAdmin  bool   `json:"is_admin"`
-	Enabled  *bool  `json:"enabled"`
+	Username string `json:"username"` // Username 字段说明。
+	Password string `json:"password"` // Password 字段说明。
+	IsAdmin  bool   `json:"is_admin"` // IsAdmin 字段说明。
+	Enabled  *bool  `json:"enabled"`  // Enabled 字段说明。
 }
 
+// adminUpdateUserRequest 表示数据结构定义。
 type adminUpdateUserRequest struct {
-	Password *string `json:"password"`
-	IsAdmin  *bool   `json:"is_admin"`
-	Enabled  *bool   `json:"enabled"`
+	Password *string `json:"password"` // Password 字段说明。
+	IsAdmin  *bool   `json:"is_admin"` // IsAdmin 字段说明。
+	Enabled  *bool   `json:"enabled"`  // Enabled 字段说明。
 }
 
+// adminListUsers 是 *Server 的方法实现。
 func (s *Server) adminListUsers(ctx context.Context, c *app.RequestContext) {
 	rows, err := s.svc.ListUsers(ctx)
 	if err != nil {
@@ -48,6 +51,7 @@ func (s *Server) adminListUsers(ctx context.Context, c *app.RequestContext) {
 	writeOK(c, map[string]any{"items": out})
 }
 
+// adminCreateUser 是 *Server 的方法实现。
 func (s *Server) adminCreateUser(ctx context.Context, c *app.RequestContext) {
 	var req adminCreateUserRequest
 	if err := bindJSON(c, &req); err != nil {
@@ -72,6 +76,7 @@ func (s *Server) adminCreateUser(ctx context.Context, c *app.RequestContext) {
 	})
 }
 
+// adminUpdateUser 是 *Server 的方法实现。
 func (s *Server) adminUpdateUser(ctx context.Context, c *app.RequestContext) {
 	id64, err := strconv.ParseUint(strings.TrimSpace(c.Param("id")), 10, 32)
 	if err != nil {
@@ -99,53 +104,56 @@ func (s *Server) adminUpdateUser(ctx context.Context, c *app.RequestContext) {
 	})
 }
 
+// adminProjectRequest 表示数据结构定义。
 type adminProjectRequest struct {
-	ProjectKey       string  `json:"project_key"`
-	ProjectSlug      string  `json:"project_slug"`
-	Name             string  `json:"name"`
-	Provider         string  `json:"provider"`
-	ProviderURL      string  `json:"provider_url"`
-	RepoURL          string  `json:"repo_url"`
-	DefaultBranch    string  `json:"default_branch"`
-	IssueProjectID   *string `json:"issue_project_id"`
-	CredentialRef    string  `json:"credential_ref"`
-	ProjectToken     *string `json:"project_token"`
-	PollIntervalSec  int     `json:"poll_interval_sec"`
-	Enabled          *bool   `json:"enabled"`
-	LabelAgentReady  string  `json:"label_agent_ready"`
-	LabelInProgress  string  `json:"label_in_progress"`
-	LabelHumanReview string  `json:"label_human_review"`
-	LabelRework      string  `json:"label_rework"`
-	LabelVerified    string  `json:"label_verified"`
-	LabelMerged      string  `json:"label_merged"`
+	ProjectKey       string  `json:"project_key"`        // ProjectKey 字段说明。
+	ProjectSlug      string  `json:"project_slug"`       // ProjectSlug 字段说明。
+	Name             string  `json:"name"`               // Name 字段说明。
+	Provider         string  `json:"provider"`           // Provider 字段说明。
+	ProviderURL      string  `json:"provider_url"`       // ProviderURL 字段说明。
+	RepoURL          string  `json:"repo_url"`           // RepoURL 字段说明。
+	DefaultBranch    string  `json:"default_branch"`     // DefaultBranch 字段说明。
+	IssueProjectID   *string `json:"issue_project_id"`   // IssueProjectID 字段说明。
+	CredentialRef    string  `json:"credential_ref"`     // CredentialRef 字段说明。
+	ProjectToken     *string `json:"project_token"`      // ProjectToken 字段说明。
+	PollIntervalSec  int     `json:"poll_interval_sec"`  // PollIntervalSec 字段说明。
+	Enabled          *bool   `json:"enabled"`            // Enabled 字段说明。
+	LabelAgentReady  string  `json:"label_agent_ready"`  // LabelAgentReady 字段说明。
+	LabelInProgress  string  `json:"label_in_progress"`  // LabelInProgress 字段说明。
+	LabelHumanReview string  `json:"label_human_review"` // LabelHumanReview 字段说明。
+	LabelRework      string  `json:"label_rework"`       // LabelRework 字段说明。
+	LabelVerified    string  `json:"label_verified"`     // LabelVerified 字段说明。
+	LabelMerged      string  `json:"label_merged"`       // LabelMerged 字段说明。
 }
 
+// adminProjectItem 表示数据结构定义。
 type adminProjectItem struct {
-	ID               uint       `json:"id"`
-	ProjectKey       string     `json:"project_key"`
-	ProjectSlug      string     `json:"project_slug"`
-	Name             string     `json:"name"`
-	Provider         string     `json:"provider"`
-	ProviderURL      string     `json:"provider_url"`
-	RepoURL          string     `json:"repo_url"`
-	DefaultBranch    string     `json:"default_branch"`
-	IssueProjectID   *string    `json:"issue_project_id,omitempty"`
-	CredentialRef    string     `json:"credential_ref"`
-	ProjectToken     *string    `json:"project_token,omitempty"`
-	PollIntervalSec  int        `json:"poll_interval_sec"`
-	Enabled          bool       `json:"enabled"`
-	LastIssueSyncAt  *time.Time `json:"last_issue_sync_at,omitempty"`
-	LabelAgentReady  string     `json:"label_agent_ready"`
-	LabelInProgress  string     `json:"label_in_progress"`
-	LabelHumanReview string     `json:"label_human_review"`
-	LabelRework      string     `json:"label_rework"`
-	LabelVerified    string     `json:"label_verified"`
-	LabelMerged      string     `json:"label_merged"`
-	CreatedBy        uint       `json:"created_by"`
-	CreatedAt        time.Time  `json:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at"`
+	ID               uint       `json:"id"`                           // ID 字段说明。
+	ProjectKey       string     `json:"project_key"`                  // ProjectKey 字段说明。
+	ProjectSlug      string     `json:"project_slug"`                 // ProjectSlug 字段说明。
+	Name             string     `json:"name"`                         // Name 字段说明。
+	Provider         string     `json:"provider"`                     // Provider 字段说明。
+	ProviderURL      string     `json:"provider_url"`                 // ProviderURL 字段说明。
+	RepoURL          string     `json:"repo_url"`                     // RepoURL 字段说明。
+	DefaultBranch    string     `json:"default_branch"`               // DefaultBranch 字段说明。
+	IssueProjectID   *string    `json:"issue_project_id,omitempty"`   // IssueProjectID 字段说明。
+	CredentialRef    string     `json:"credential_ref"`               // CredentialRef 字段说明。
+	ProjectToken     *string    `json:"project_token,omitempty"`      // ProjectToken 字段说明。
+	PollIntervalSec  int        `json:"poll_interval_sec"`            // PollIntervalSec 字段说明。
+	Enabled          bool       `json:"enabled"`                      // Enabled 字段说明。
+	LastIssueSyncAt  *time.Time `json:"last_issue_sync_at,omitempty"` // LastIssueSyncAt 字段说明。
+	LabelAgentReady  string     `json:"label_agent_ready"`            // LabelAgentReady 字段说明。
+	LabelInProgress  string     `json:"label_in_progress"`            // LabelInProgress 字段说明。
+	LabelHumanReview string     `json:"label_human_review"`           // LabelHumanReview 字段说明。
+	LabelRework      string     `json:"label_rework"`                 // LabelRework 字段说明。
+	LabelVerified    string     `json:"label_verified"`               // LabelVerified 字段说明。
+	LabelMerged      string     `json:"label_merged"`                 // LabelMerged 字段说明。
+	CreatedBy        uint       `json:"created_by"`                   // CreatedBy 字段说明。
+	CreatedAt        time.Time  `json:"created_at"`                   // CreatedAt 字段说明。
+	UpdatedAt        time.Time  `json:"updated_at"`                   // UpdatedAt 字段说明。
 }
 
+// adminListProjects 是 *Server 的方法实现。
 func (s *Server) adminListProjects(ctx context.Context, c *app.RequestContext) {
 	rows, err := s.svc.ListProjects(ctx)
 	if err != nil {
@@ -159,6 +167,7 @@ func (s *Server) adminListProjects(ctx context.Context, c *app.RequestContext) {
 	writeOK(c, map[string]any{"items": out})
 }
 
+// adminCreateProject 是 *Server 的方法实现。
 func (s *Server) adminCreateProject(ctx context.Context, c *app.RequestContext) {
 	var req adminProjectRequest
 	if err := bindJSON(c, &req); err != nil {
@@ -199,6 +208,7 @@ func (s *Server) adminCreateProject(ctx context.Context, c *app.RequestContext) 
 	writeOK(c, toAdminProjectItem(*row))
 }
 
+// adminUpdateProject 是 *Server 的方法实现。
 func (s *Server) adminUpdateProject(ctx context.Context, c *app.RequestContext) {
 	projectKey := strings.TrimSpace(c.Param("projectKey"))
 	if projectKey == "" {
@@ -242,49 +252,54 @@ func (s *Server) adminUpdateProject(ctx context.Context, c *app.RequestContext) 
 	writeOK(c, toAdminProjectItem(*row))
 }
 
+// putPromptRequest 表示数据结构定义。
 type putPromptRequest struct {
-	Content string `json:"content"`
+	Content string `json:"content"` // Content 字段说明。
 }
 
+// adminRunItem 表示数据结构定义。
 type adminRunItem struct {
-	ID                 uint       `json:"id"`
-	IssueID            uint       `json:"issue_id"`
-	RunNo              int        `json:"run_no"`
-	RunKind            string     `json:"run_kind"`
-	TriggerType        string     `json:"trigger_type"`
-	Status             string     `json:"status"`
-	AgentRole          string     `json:"agent_role"`
-	LoopStep           int        `json:"loop_step"`
-	MaxLoopStep        int        `json:"max_loop_step"`
-	QueuedAt           time.Time  `json:"queued_at"`
-	StartedAt          *time.Time `json:"started_at,omitempty"`
-	FinishedAt         *time.Time `json:"finished_at,omitempty"`
-	BranchName         string     `json:"branch_name"`
-	MRIID              *int64     `json:"mr_iid,omitempty"`
-	MRURL              *string    `json:"mr_url,omitempty"`
-	ConflictRetryCount int        `json:"conflict_retry_count"`
-	MaxConflictRetry   int        `json:"max_conflict_retry"`
-	ErrorSummary       *string    `json:"error_summary,omitempty"`
-	CreatedAt          time.Time  `json:"created_at"`
-	UpdatedAt          time.Time  `json:"updated_at"`
+	ID                 uint       `json:"id"`                      // ID 字段说明。
+	IssueID            uint       `json:"issue_id"`                // IssueID 字段说明。
+	RunNo              int        `json:"run_no"`                  // RunNo 字段说明。
+	RunKind            string     `json:"run_kind"`                // RunKind 字段说明。
+	TriggerType        string     `json:"trigger_type"`            // TriggerType 字段说明。
+	Status             string     `json:"status"`                  // Status 字段说明。
+	AgentRole          string     `json:"agent_role"`              // AgentRole 字段说明。
+	LoopStep           int        `json:"loop_step"`               // LoopStep 字段说明。
+	MaxLoopStep        int        `json:"max_loop_step"`           // MaxLoopStep 字段说明。
+	QueuedAt           time.Time  `json:"queued_at"`               // QueuedAt 字段说明。
+	StartedAt          *time.Time `json:"started_at,omitempty"`    // StartedAt 字段说明。
+	FinishedAt         *time.Time `json:"finished_at,omitempty"`   // FinishedAt 字段说明。
+	BranchName         string     `json:"branch_name"`             // BranchName 字段说明。
+	MRIID              *int64     `json:"mr_iid,omitempty"`        // MRIID 字段说明。
+	MRURL              *string    `json:"mr_url,omitempty"`        // MRURL 字段说明。
+	ConflictRetryCount int        `json:"conflict_retry_count"`    // ConflictRetryCount 字段说明。
+	MaxConflictRetry   int        `json:"max_conflict_retry"`      // MaxConflictRetry 字段说明。
+	ErrorSummary       *string    `json:"error_summary,omitempty"` // ErrorSummary 字段说明。
+	CreatedAt          time.Time  `json:"created_at"`              // CreatedAt 字段说明。
+	UpdatedAt          time.Time  `json:"updated_at"`              // UpdatedAt 字段说明。
 }
 
+// adminRunLogItem 表示数据结构定义。
 type adminRunLogItem struct {
-	ID          uint      `json:"id"`
-	RunID       uint      `json:"run_id"`
-	Seq         int       `json:"seq"`
-	At          time.Time `json:"at"`
-	Level       string    `json:"level"`
-	Stage       string    `json:"stage"`
-	EventType   string    `json:"event_type"`
-	Message     string    `json:"message"`
-	PayloadJSON *string   `json:"payload_json,omitempty"`
+	ID          uint      `json:"id"`                     // ID 字段说明。
+	RunID       uint      `json:"run_id"`                 // RunID 字段说明。
+	Seq         int       `json:"seq"`                    // Seq 字段说明。
+	At          time.Time `json:"at"`                     // At 字段说明。
+	Level       string    `json:"level"`                  // Level 字段说明。
+	Stage       string    `json:"stage"`                  // Stage 字段说明。
+	EventType   string    `json:"event_type"`             // EventType 字段说明。
+	Message     string    `json:"message"`                // Message 字段说明。
+	PayloadJSON *string   `json:"payload_json,omitempty"` // PayloadJSON 字段说明。
 }
 
+// adminRunActionRequest 表示数据结构定义。
 type adminRunActionRequest struct {
-	Reason string `json:"reason"`
+	Reason string `json:"reason"` // Reason 字段说明。
 }
 
+// listDefaultPrompts 是 *Server 的方法实现。
 func (s *Server) listDefaultPrompts(_ context.Context, c *app.RequestContext) {
 	rows, err := s.svc.ListDefaultPrompts()
 	if err != nil {
@@ -294,6 +309,7 @@ func (s *Server) listDefaultPrompts(_ context.Context, c *app.RequestContext) {
 	writeOK(c, map[string]any{"items": rows})
 }
 
+// listProjectPrompts 是 *Server 的方法实现。
 func (s *Server) listProjectPrompts(ctx context.Context, c *app.RequestContext) {
 	projectKey := strings.TrimSpace(c.Param("projectKey"))
 	if projectKey == "" {
@@ -312,6 +328,7 @@ func (s *Server) listProjectPrompts(ctx context.Context, c *app.RequestContext) 
 	})
 }
 
+// putProjectPrompt 是 *Server 的方法实现。
 func (s *Server) putProjectPrompt(ctx context.Context, c *app.RequestContext) {
 	projectKey := strings.TrimSpace(c.Param("projectKey"))
 	runKind := strings.TrimSpace(c.Param("runKind"))
@@ -335,6 +352,7 @@ func (s *Server) putProjectPrompt(ctx context.Context, c *app.RequestContext) {
 	writeOK(c, row)
 }
 
+// deleteProjectPrompt 是 *Server 的方法实现。
 func (s *Server) deleteProjectPrompt(ctx context.Context, c *app.RequestContext) {
 	projectKey := strings.TrimSpace(c.Param("projectKey"))
 	runKind := strings.TrimSpace(c.Param("runKind"))
@@ -356,6 +374,7 @@ func (s *Server) deleteProjectPrompt(ctx context.Context, c *app.RequestContext)
 	})
 }
 
+// adminProjectIssues 是 *Server 的方法实现。
 func (s *Server) adminProjectIssues(ctx context.Context, c *app.RequestContext) {
 	projectKey := strings.TrimSpace(c.Param("projectKey"))
 	if projectKey == "" {
@@ -383,6 +402,7 @@ func (s *Server) adminProjectIssues(ctx context.Context, c *app.RequestContext) 
 	})
 }
 
+// adminIssueRuns 是 *Server 的方法实现。
 func (s *Server) adminIssueRuns(ctx context.Context, c *app.RequestContext) {
 	issueID64, err := strconv.ParseUint(strings.TrimSpace(c.Param("issueID")), 10, 32)
 	if err != nil {
@@ -410,6 +430,7 @@ func (s *Server) adminIssueRuns(ctx context.Context, c *app.RequestContext) {
 	})
 }
 
+// adminRunLogs 是 *Server 的方法实现。
 func (s *Server) adminRunLogs(ctx context.Context, c *app.RequestContext) {
 	runID64, err := strconv.ParseUint(strings.TrimSpace(c.Param("runID")), 10, 32)
 	if err != nil {
@@ -447,6 +468,7 @@ func (s *Server) adminRunLogs(ctx context.Context, c *app.RequestContext) {
 	})
 }
 
+// adminRetryIssue 是 *Server 的方法实现。
 func (s *Server) adminRetryIssue(ctx context.Context, c *app.RequestContext) {
 	issueID64, err := strconv.ParseUint(strings.TrimSpace(c.Param("issueID")), 10, 32)
 	if err != nil {
@@ -466,6 +488,7 @@ func (s *Server) adminRetryIssue(ctx context.Context, c *app.RequestContext) {
 	})
 }
 
+// adminCancelRun 是 *Server 的方法实现。
 func (s *Server) adminCancelRun(ctx context.Context, c *app.RequestContext) {
 	runID64, err := strconv.ParseUint(strings.TrimSpace(c.Param("runID")), 10, 32)
 	if err != nil {
@@ -487,6 +510,7 @@ func (s *Server) adminCancelRun(ctx context.Context, c *app.RequestContext) {
 	writeOK(c, toAdminRunItem(*row))
 }
 
+// adminResetProjectSyncCursor 是 *Server 的方法实现。
 func (s *Server) adminResetProjectSyncCursor(ctx context.Context, c *app.RequestContext) {
 	projectKey := strings.TrimSpace(c.Param("projectKey"))
 	if projectKey == "" {
@@ -505,6 +529,7 @@ func (s *Server) adminResetProjectSyncCursor(ctx context.Context, c *app.Request
 	})
 }
 
+// adminMetrics 是 *Server 的方法实现。
 func (s *Server) adminMetrics(ctx context.Context, c *app.RequestContext) {
 	row, err := s.svc.GetOpsMetrics(ctx)
 	if err != nil {
@@ -514,6 +539,7 @@ func (s *Server) adminMetrics(ctx context.Context, c *app.RequestContext) {
 	writeOK(c, row)
 }
 
+// toAdminProjectItem 执行相关逻辑。
 func toAdminProjectItem(row db.Project) adminProjectItem {
 	return adminProjectItem{
 		ID:               row.ID,
@@ -542,6 +568,7 @@ func toAdminProjectItem(row db.Project) adminProjectItem {
 	}
 }
 
+// toAdminRunItem 执行相关逻辑。
 func toAdminRunItem(row db.IssueRun) adminRunItem {
 	return adminRunItem{
 		ID:                 row.ID,

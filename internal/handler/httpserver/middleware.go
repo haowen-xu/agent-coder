@@ -12,6 +12,7 @@ const (
 	ctxUserKey = "auth_user"
 )
 
+// requireLogin 是 *Server 的方法实现。
 func (s *Server) requireLogin() app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		authz := strings.TrimSpace(string(c.GetHeader("Authorization")))
@@ -49,6 +50,7 @@ func (s *Server) requireLogin() app.HandlerFunc {
 	}
 }
 
+// requireAdmin 是 *Server 的方法实现。
 func (s *Server) requireAdmin() app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		user := currentUser(c)
@@ -61,6 +63,7 @@ func (s *Server) requireAdmin() app.HandlerFunc {
 	}
 }
 
+// currentUser 执行相关逻辑。
 func currentUser(c *app.RequestContext) *authUserView {
 	v, ok := c.Get(ctxUserKey)
 	if !ok {
@@ -73,9 +76,10 @@ func currentUser(c *app.RequestContext) *authUserView {
 	return nil
 }
 
+// authUserView 表示数据结构定义。
 type authUserView struct {
-	ID       uint   `json:"id"`
-	Username string `json:"username"`
-	IsAdmin  bool   `json:"is_admin"`
-	Enabled  bool   `json:"enabled"`
+	ID       uint   `json:"id"`       // ID 字段说明。
+	Username string `json:"username"` // Username 字段说明。
+	IsAdmin  bool   `json:"is_admin"` // IsAdmin 字段说明。
+	Enabled  bool   `json:"enabled"`  // Enabled 字段说明。
 }

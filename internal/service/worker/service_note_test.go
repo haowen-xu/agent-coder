@@ -7,6 +7,7 @@ import (
 	repocommon "github.com/haowen-xu/agent-coder/internal/infra/repo/common"
 )
 
+// TestBuildMRReadyNote_WithMRURL 用于单元测试。
 func TestBuildMRReadyNote_WithMRURL(t *testing.T) {
 	t.Parallel()
 
@@ -24,6 +25,7 @@ func TestBuildMRReadyNote_WithMRURL(t *testing.T) {
 	mustContain(t, note, "- Target Branch: `main`")
 }
 
+// TestBuildMRReadyNote_NoMR 用于单元测试。
 func TestBuildMRReadyNote_NoMR(t *testing.T) {
 	t.Parallel()
 
@@ -33,6 +35,7 @@ func TestBuildMRReadyNote_NoMR(t *testing.T) {
 	}
 }
 
+// mustContain 执行相关逻辑。
 func mustContain(t *testing.T, text string, expected string) {
 	t.Helper()
 	if !strings.Contains(text, expected) {

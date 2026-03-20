@@ -14,12 +14,14 @@ import (
 	"github.com/haowen-xu/agent-coder/internal/xerr"
 )
 
+// Service 表示数据结构定义。
 type Service struct {
-	cfg *appcfg.Config
-	db  *db.Client
-	ps  *promptstore.Service
+	cfg *appcfg.Config       // cfg 字段说明。
+	db  *db.Client           // db 字段说明。
+	ps  *promptstore.Service // ps 字段说明。
 }
 
+// New 执行相关逻辑。
 func New(cfg *appcfg.Config, dbClient *db.Client, ps *promptstore.Service) *Service {
 	return &Service{
 		cfg: cfg,
@@ -28,13 +30,15 @@ func New(cfg *appcfg.Config, dbClient *db.Client, ps *promptstore.Service) *Serv
 	}
 }
 
+// AuthUser 表示数据结构定义。
 type AuthUser struct {
-	ID       uint
-	Username string
-	IsAdmin  bool
-	Enabled  bool
+	ID       uint   // ID 字段说明。
+	Username string // Username 字段说明。
+	IsAdmin  bool   // IsAdmin 字段说明。
+	Enabled  bool   // Enabled 字段说明。
 }
 
+// Login 是 *Service 的方法实现。
 func (s *Service) Login(ctx context.Context, username string, password string) (string, time.Time, *AuthUser, error) {
 	username = strings.TrimSpace(username)
 	if username == "" || password == "" {
@@ -78,6 +82,7 @@ func (s *Service) Login(ctx context.Context, username string, password string) (
 	}, nil
 }
 
+// AuthByToken 是 *Service 的方法实现。
 func (s *Service) AuthByToken(ctx context.Context, token string) (*AuthUser, error) {
 	_, user, err := s.db.GetSessionWithUser(ctx, token)
 	if err != nil {
@@ -94,10 +99,12 @@ func (s *Service) AuthByToken(ctx context.Context, token string) (*AuthUser, err
 	}, nil
 }
 
+// ListUsers 是 *Service 的方法实现。
 func (s *Service) ListUsers(ctx context.Context) ([]db.User, error) {
 	return s.db.ListUsers(ctx)
 }
 
+// CreateUser 是 *Service 的方法实现。
 func (s *Service) CreateUser(ctx context.Context, username string, password string, isAdmin bool, enabled bool) (*db.User, error) {
 	username = strings.TrimSpace(username)
 	if username == "" || password == "" {
@@ -127,6 +134,7 @@ func (s *Service) CreateUser(ctx context.Context, username string, password stri
 	return row, nil
 }
 
+// UpdateUser 是 *Service 的方法实现。
 func (s *Service) UpdateUser(ctx context.Context, userID uint, password *string, isAdmin *bool, enabled *bool) (*db.User, error) {
 	row, err := s.db.GetUserByID(ctx, userID)
 	if err != nil {
@@ -154,31 +162,34 @@ func (s *Service) UpdateUser(ctx context.Context, userID uint, password *string,
 	return row, nil
 }
 
+// ListProjects 是 *Service 的方法实现。
 func (s *Service) ListProjects(ctx context.Context) ([]db.Project, error) {
 	return s.db.ListProjects(ctx)
 }
 
+// ProjectUpsertInput 表示数据结构定义。
 type ProjectUpsertInput struct {
-	ProjectKey       string
-	ProjectSlug      string
-	Name             string
-	Provider         string
-	ProviderURL      string
-	RepoURL          string
-	DefaultBranch    string
-	IssueProjectID   *string
-	CredentialRef    string
-	ProjectToken     *string
-	PollIntervalSec  int
-	Enabled          bool
-	LabelAgentReady  string
-	LabelInProgress  string
-	LabelHumanReview string
-	LabelRework      string
-	LabelVerified    string
-	LabelMerged      string
+	ProjectKey       string  // ProjectKey 字段说明。
+	ProjectSlug      string  // ProjectSlug 字段说明。
+	Name             string  // Name 字段说明。
+	Provider         string  // Provider 字段说明。
+	ProviderURL      string  // ProviderURL 字段说明。
+	RepoURL          string  // RepoURL 字段说明。
+	DefaultBranch    string  // DefaultBranch 字段说明。
+	IssueProjectID   *string // IssueProjectID 字段说明。
+	CredentialRef    string  // CredentialRef 字段说明。
+	ProjectToken     *string // ProjectToken 字段说明。
+	PollIntervalSec  int     // PollIntervalSec 字段说明。
+	Enabled          bool    // Enabled 字段说明。
+	LabelAgentReady  string  // LabelAgentReady 字段说明。
+	LabelInProgress  string  // LabelInProgress 字段说明。
+	LabelHumanReview string  // LabelHumanReview 字段说明。
+	LabelRework      string  // LabelRework 字段说明。
+	LabelVerified    string  // LabelVerified 字段说明。
+	LabelMerged      string  // LabelMerged 字段说明。
 }
 
+// NormalizeProjectInput 执行相关逻辑。
 func NormalizeProjectInput(in *ProjectUpsertInput) {
 	in.ProjectKey = strings.TrimSpace(in.ProjectKey)
 	in.ProjectSlug = strings.TrimSpace(in.ProjectSlug)
@@ -225,6 +236,7 @@ func NormalizeProjectInput(in *ProjectUpsertInput) {
 	}
 }
 
+// ValidateProjectInput 执行相关逻辑。
 func ValidateProjectInput(in ProjectUpsertInput) error {
 	if in.ProjectKey == "" {
 		return xerr.Config.New("project_key is required")
@@ -247,6 +259,7 @@ func ValidateProjectInput(in ProjectUpsertInput) error {
 	return nil
 }
 
+// CreateProject 是 *Service 的方法实现。
 func (s *Service) CreateProject(ctx context.Context, createdBy uint, in ProjectUpsertInput) (*db.Project, error) {
 	NormalizeProjectInput(&in)
 	if err := ValidateProjectInput(in); err != nil {
@@ -286,6 +299,7 @@ func (s *Service) CreateProject(ctx context.Context, createdBy uint, in ProjectU
 	return row, nil
 }
 
+// UpdateProject 是 *Service 的方法实现。
 func (s *Service) UpdateProject(ctx context.Context, projectKey string, in ProjectUpsertInput) (*db.Project, error) {
 	projectKey = strings.TrimSpace(projectKey)
 	NormalizeProjectInput(&in)
@@ -327,6 +341,7 @@ func (s *Service) UpdateProject(ctx context.Context, projectKey string, in Proje
 	return row, nil
 }
 
+// ListProjectIssues 是 *Service 的方法实现。
 func (s *Service) ListProjectIssues(ctx context.Context, projectKey string, limit int) ([]db.Issue, error) {
 	project, err := s.db.GetProjectByKey(ctx, strings.TrimSpace(projectKey))
 	if err != nil {
@@ -338,22 +353,27 @@ func (s *Service) ListProjectIssues(ctx context.Context, projectKey string, limi
 	return s.db.ListIssuesByProject(ctx, project.ID, limit)
 }
 
+// ListDefaultPrompts 是 *Service 的方法实现。
 func (s *Service) ListDefaultPrompts() ([]prompts.Template, error) {
 	return s.ps.ListDefaults()
 }
 
+// ListProjectPrompts 是 *Service 的方法实现。
 func (s *Service) ListProjectPrompts(ctx context.Context, projectKey string) ([]prompts.Template, error) {
 	return s.ps.ListEffectiveByProject(ctx, projectKey)
 }
 
+// UpsertProjectPrompt 是 *Service 的方法实现。
 func (s *Service) UpsertProjectPrompt(ctx context.Context, projectKey, runKind, role, content string) (*prompts.Template, error) {
 	return s.ps.UpsertProjectOverride(ctx, projectKey, runKind, role, content)
 }
 
+// DeleteProjectPrompt 是 *Service 的方法实现。
 func (s *Service) DeleteProjectPrompt(ctx context.Context, projectKey, runKind, role string) error {
 	return s.ps.DeleteProjectOverride(ctx, projectKey, runKind, role)
 }
 
+// ListIssueRuns 是 *Service 的方法实现。
 func (s *Service) ListIssueRuns(ctx context.Context, issueID uint, limit int) ([]db.IssueRun, error) {
 	issue, err := s.db.GetIssueByID(ctx, issueID)
 	if err != nil {
@@ -365,6 +385,7 @@ func (s *Service) ListIssueRuns(ctx context.Context, issueID uint, limit int) ([
 	return s.db.ListRunsByIssue(ctx, issueID, limit)
 }
 
+// ListRunLogs 是 *Service 的方法实现。
 func (s *Service) ListRunLogs(ctx context.Context, runID uint, limit int) ([]db.RunLog, error) {
 	run, err := s.db.GetRunByID(ctx, runID)
 	if err != nil {
@@ -376,6 +397,7 @@ func (s *Service) ListRunLogs(ctx context.Context, runID uint, limit int) ([]db.
 	return s.db.ListRunLogsByRun(ctx, runID, limit)
 }
 
+// RetryIssue 是 *Service 的方法实现。
 func (s *Service) RetryIssue(ctx context.Context, issueID uint) (*db.Issue, error) {
 	issue, err := s.db.GetIssueByID(ctx, issueID)
 	if err != nil {
@@ -404,6 +426,7 @@ func (s *Service) RetryIssue(ctx context.Context, issueID uint) (*db.Issue, erro
 	return issue, nil
 }
 
+// CancelRun 是 *Service 的方法实现。
 func (s *Service) CancelRun(ctx context.Context, runID uint, reason string) (*db.IssueRun, error) {
 	row, err := s.db.GetRunByID(ctx, runID)
 	if err != nil {
@@ -447,6 +470,7 @@ func (s *Service) CancelRun(ctx context.Context, runID uint, reason string) (*db
 	return row, nil
 }
 
+// ResetProjectSyncCursor 是 *Service 的方法实现。
 func (s *Service) ResetProjectSyncCursor(ctx context.Context, projectKey string) (*db.Project, error) {
 	row, err := s.db.ResetProjectSyncCursorByKey(ctx, projectKey)
 	if err != nil {
@@ -458,29 +482,34 @@ func (s *Service) ResetProjectSyncCursor(ctx context.Context, projectKey string)
 	return row, nil
 }
 
+// OpsMetrics 表示数据结构定义。
 type OpsMetrics struct {
-	Timestamp time.Time         `json:"timestamp"`
-	Projects  OpsProjectsMetric `json:"projects"`
-	Issues    OpsIssueMetric    `json:"issues"`
-	Runs      OpsRunMetric      `json:"runs"`
+	Timestamp time.Time         `json:"timestamp"` // Timestamp 字段说明。
+	Projects  OpsProjectsMetric `json:"projects"`  // Projects 字段说明。
+	Issues    OpsIssueMetric    `json:"issues"`    // Issues 字段说明。
+	Runs      OpsRunMetric      `json:"runs"`      // Runs 字段说明。
 }
 
+// OpsProjectsMetric 表示数据结构定义。
 type OpsProjectsMetric struct {
-	Total   int64 `json:"total"`
-	Enabled int64 `json:"enabled"`
+	Total   int64 `json:"total"`   // Total 字段说明。
+	Enabled int64 `json:"enabled"` // Enabled 字段说明。
 }
 
+// OpsIssueMetric 表示数据结构定义。
 type OpsIssueMetric struct {
-	Total       int64            `json:"total"`
-	ByLifecycle map[string]int64 `json:"by_lifecycle"`
+	Total       int64            `json:"total"`        // Total 字段说明。
+	ByLifecycle map[string]int64 `json:"by_lifecycle"` // ByLifecycle 字段说明。
 }
 
+// OpsRunMetric 表示数据结构定义。
 type OpsRunMetric struct {
-	Total    int64            `json:"total"`
-	ByStatus map[string]int64 `json:"by_status"`
-	ByKind   map[string]int64 `json:"by_kind"`
+	Total    int64            `json:"total"`     // Total 字段说明。
+	ByStatus map[string]int64 `json:"by_status"` // ByStatus 字段说明。
+	ByKind   map[string]int64 `json:"by_kind"`   // ByKind 字段说明。
 }
 
+// GetOpsMetrics 是 *Service 的方法实现。
 func (s *Service) GetOpsMetrics(ctx context.Context) (*OpsMetrics, error) {
 	projectTotal, projectEnabled, err := s.db.CountProjects(ctx)
 	if err != nil {
@@ -524,6 +553,7 @@ func (s *Service) GetOpsMetrics(ctx context.Context) (*OpsMetrics, error) {
 	}, nil
 }
 
+// GuardAdmin 是 *Service 的方法实现。
 func (s *Service) GuardAdmin(user *AuthUser) error {
 	if user == nil || !user.IsAdmin {
 		return xerr.Config.New("admin required")
@@ -531,6 +561,7 @@ func (s *Service) GuardAdmin(user *AuthUser) error {
 	return nil
 }
 
+// stringPtr 执行相关逻辑。
 func stringPtr(v string) *string {
 	if strings.TrimSpace(v) == "" {
 		return nil
@@ -539,6 +570,7 @@ func stringPtr(v string) *string {
 	return &s
 }
 
+// Describe 是 *Service 的方法实现。
 func (s *Service) Describe() string {
 	return fmt.Sprintf("core service env=%s", s.cfg.App.Env)
 }

@@ -16,10 +16,12 @@ import (
 
 var resultJSONRE = regexp.MustCompile("(?s)```RESULT_JSON\\s*(\\{.*?\\})\\s*```")
 
+// Client 表示数据结构定义。
 type Client struct {
-	binary string
+	binary string // binary 字段说明。
 }
 
+// NewClient 执行相关逻辑。
 func NewClient(binary string) *Client {
 	bin := strings.TrimSpace(binary)
 	if bin == "" {
@@ -28,10 +30,12 @@ func NewClient(binary string) *Client {
 	return &Client{binary: bin}
 }
 
+// Name 是方法实现。
 func (c *Client) Name() string {
 	return "codex"
 }
 
+// Run 是方法实现。
 func (c *Client) Run(ctx context.Context, req base.InvokeRequest) (*base.InvokeResult, error) {
 	timeout := req.Timeout
 	if timeout <= 0 {
@@ -85,6 +89,7 @@ func (c *Client) Run(ctx context.Context, req base.InvokeRequest) (*base.InvokeR
 	return result, nil
 }
 
+// parseDecision 执行相关逻辑。
 func parseDecision(out string) base.Decision {
 	match := resultJSONRE.FindStringSubmatch(out)
 	if len(match) < 2 {
@@ -98,6 +103,7 @@ func parseDecision(out string) base.Decision {
 	return row
 }
 
+// fallbackDecision 执行相关逻辑。
 func fallbackDecision(role string, reason string) base.Decision {
 	role = strings.TrimSpace(role)
 	if role == "review" {
@@ -123,6 +129,7 @@ func fallbackDecision(role string, reason string) base.Decision {
 	}
 }
 
+// exitStatus 执行相关逻辑。
 func exitStatus(err *exec.ExitError) int {
 	if err == nil {
 		return 0

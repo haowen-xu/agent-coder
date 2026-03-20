@@ -7,11 +7,13 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 )
 
+// loginRequest 表示数据结构定义。
 type loginRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username string `json:"username"` // Username 字段说明。
+	Password string `json:"password"` // Password 字段说明。
 }
 
+// login 是 *Server 的方法实现。
 func (s *Server) login(ctx context.Context, c *app.RequestContext) {
 	var req loginRequest
 	if err := bindJSON(c, &req); err != nil {
@@ -36,6 +38,7 @@ func (s *Server) login(ctx context.Context, c *app.RequestContext) {
 	})
 }
 
+// me 是 *Server 的方法实现。
 func (s *Server) me(_ context.Context, c *app.RequestContext) {
 	user := currentUser(c)
 	if user == nil {

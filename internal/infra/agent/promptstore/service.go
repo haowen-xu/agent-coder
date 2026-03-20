@@ -9,18 +9,22 @@ import (
 	"github.com/haowen-xu/agent-coder/internal/xerr"
 )
 
+// Service 表示数据结构定义。
 type Service struct {
-	db *db.Client
+	db *db.Client // db 字段说明。
 }
 
+// NewService 执行相关逻辑。
 func NewService(dbClient *db.Client) *Service {
 	return &Service{db: dbClient}
 }
 
+// ListDefaults 是 *Service 的方法实现。
 func (s *Service) ListDefaults() ([]prompts.Template, error) {
 	return prompts.ListDefaultTemplates()
 }
 
+// ListEffectiveByProject 是 *Service 的方法实现。
 func (s *Service) ListEffectiveByProject(ctx context.Context, projectKey string) ([]prompts.Template, error) {
 	projectKey = strings.TrimSpace(projectKey)
 	if projectKey == "" {
@@ -65,6 +69,7 @@ func (s *Service) ListEffectiveByProject(ctx context.Context, projectKey string)
 	return out, nil
 }
 
+// UpsertProjectOverride 是 *Service 的方法实现。
 func (s *Service) UpsertProjectOverride(
 	ctx context.Context,
 	projectKey string,
@@ -103,6 +108,7 @@ func (s *Service) UpsertProjectOverride(
 	}, nil
 }
 
+// DeleteProjectOverride 是 *Service 的方法实现。
 func (s *Service) DeleteProjectOverride(ctx context.Context, projectKey string, runKind string, agentRole string) error {
 	projectKey = strings.TrimSpace(projectKey)
 	runKind = strings.TrimSpace(runKind)
