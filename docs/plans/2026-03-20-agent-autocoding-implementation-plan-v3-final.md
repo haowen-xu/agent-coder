@@ -58,7 +58,11 @@
 
 - 分支命名 `agent-coder/issue-<id>`。
 - 一个 issue 一个 MR（复用更新）。
-- 每个 run 生成独立 `workdir_path`（推荐 git worktree）。
+- issue 级生成 `git-tree` 代码目录（可复用）。
+- run 级生成 `agent/runs/<run_no>` 运行目录（每次 run 独立）。
+- 单次 run 采用 `dev_agent -> review_agent` 循环。
+- 使用 `issue_runs.agent_role` + `issue_runs.loop_step` 扁平记录进度。
+- 当 `loop_step > max_loop_step` 仍未通过 review，run 置 `failed`。
 - 状态标签流转：
   - 开始执行 -> `In Progress`
   - 产出 MR -> `Human Review`

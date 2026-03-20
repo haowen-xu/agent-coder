@@ -84,6 +84,7 @@ Issue 主实体与执行门禁状态。
 | labels_json | TEXT | NOT NULL，存储标签快照（JSON 数组） |
 | registered_at | TIMESTAMP | NOT NULL，写入本地登记时间 |
 | lifecycle_status | VARCHAR(24) | NOT NULL，默认 `registered` |
+| issue_dir | TEXT NOT NULL | issue 根目录绝对路径 |
 | branch_name | VARCHAR(128) NULL | 当前分支 |
 | mr_iid | BIGINT NULL | 当前 MR iid |
 | mr_url | TEXT NULL | 当前 MR URL |
@@ -118,6 +119,9 @@ Issue 主实体与执行门禁状态。
 | run_no | INT | NOT NULL，issue 内递增序号 |
 | trigger_type | VARCHAR(16) | NOT NULL，`scheduler/manual/rework/retry` |
 | status | VARCHAR(16) | NOT NULL，`queued/running/succeeded/failed/canceled` |
+| agent_role | VARCHAR(16) | NOT NULL，`dev_agent/review_agent/system`，表示当前或最近执行角色 |
+| loop_step | INT | NOT NULL，当前循环步（从 1 开始） |
+| max_loop_step | INT | NOT NULL，单次 run 最大循环步阈值 |
 | queued_at | TIMESTAMP | NOT NULL |
 | started_at | TIMESTAMP NULL | |
 | finished_at | TIMESTAMP NULL | |
@@ -126,7 +130,8 @@ Issue 主实体与执行门禁状态。
 | head_sha | VARCHAR(64) NULL | |
 | mr_iid | BIGINT NULL | |
 | mr_url | TEXT NULL | |
-| workdir_path | TEXT NOT NULL | 本次 run 的工作目录绝对路径 |
+| git_tree_path | TEXT NOT NULL | 代码工作区目录绝对路径（通常 `<issue_dir>/git-tree`） |
+| agent_run_dir | TEXT NOT NULL | agent run 运行目录绝对路径（通常 `<issue_dir>/agent/runs/<run_no>`） |
 | conflict_retry_count | INT | NOT NULL，默认 0 |
 | max_conflict_retry | INT | NOT NULL，默认 5 |
 | exit_code | INT NULL | |
@@ -243,8 +248,8 @@ Issue 主实体与执行门禁状态。
 切换条件：
 
 - `queued -> running`：worker 抢占任务
-- `running -> succeeded`：开发/验证/MR 推进成功
-- `running -> failed`：命令失败、API 失败、冲突超重试上限或其他不可继续错误
+- `running -> succeeded`：`review_agent` 判定“全部完成并通过”
+- `running -> failed`：循环步超过阈值仍未完成，或出现不可继续错误
 - `queued|running -> canceled`：人工取消
 
 说明：
@@ -253,29 +258,55 @@ Issue 主实体与执行门禁状态。
 - `issues.current_run_id` 始终指向最新 active run（`queued/running`），由应用层维护。
 - 单 issue 仅允许一个 active run（`queued/running`）属于应用层约束，不强依赖数据库硬约束。
 
+## 4.3 单次 run 的 agent loop 规则
+
+一次 `issue_run` 内部执行固定循环，不拆 `issue_sub_runs`：
+
+1. `dev_agent` 执行开发
+2. `review_agent` 执行检查
+3. 若判定完成则结束为 `succeeded`
+4. 否则 `loop_step += 1`，回到步骤 1
+
+终止条件：
+
+- `loop_step > max_loop_step` 且 `review_agent` 仍不通过 -> `failed`
+- run 过程中发生不可恢复错误 -> `failed`
+
+追踪方式（扁平化）：
+
+- 当前轮次保存在 `issue_runs.loop_step`
+- 当前/最近执行角色保存在 `issue_runs.agent_role`
+- 详细过程写入 `run_logs`（每行一条）
+
 ## 5. issue_run 工作目录设计
 
-`issue_runs.workdir_path` 为必填，并采用统一可计算路径：
+目录采用“issue 级 + run 级”双层设计：
 
-- 配置项：`runtime.workdir_root`（默认 `.agent-coder/workdirs`）
-- run 目录：
-  - `<workdir_root>/<project_key>/issue-<issue_iid>/run-<run_no>`
+- 配置项：`work.work_dir`（默认 `.agent-coder/workdirs`）
+- issue 根目录：
+  - `<workdir_root>/<project_id>/<issue_id>`
+- issue 级代码目录（复用）：
+  - `<issue_dir>/git-tree`
+- run 级 agent 目录（每次 run 独立）：
+  - `<issue_dir>/agent/runs/<run_no>`
 
 示例：
 
-- `.agent-coder/workdirs/acme-bot/issue-128/run-3`
+- `.agent-coder/workdirs/12/98/git-tree`
+- `.agent-coder/workdirs/12/98/agent/runs/3`
 
 推荐实现：
 
 1. 每个项目维护本地仓库缓存（mirror 或主 clone）
-2. 每个 run 用 `git worktree` 创建独立目录到 `workdir_path`
-3. run 结束后按策略清理（成功立即清理，失败保留 N 天）
+2. issue 级 `git-tree` 使用 `git worktree` 管理（按 issue 复用）
+3. 每次 run 仅在 `agent_run_dir` 写入输入/输出/日志元数据
+4. run 结束后按策略清理 `agent_run_dir`（成功立即清理，失败保留 N 天）
 
 目录约束：
 
-- 同一 `workdir_path` 只能绑定一个 run
-- 不复用 run 目录，避免脏状态污染
-- `run_logs` 与 `workdir_path` 一一可追溯
+- 同一 issue 的 `git-tree` 唯一（`issues.issue_dir` 决定）
+- 同一 run 的 `agent_run_dir` 唯一，不复用
+- `run_logs` 与 `agent_run_dir` 一一可追溯
 
 ## 6. SQLite / PostgreSQL 兼容约束
 

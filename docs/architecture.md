@@ -84,11 +84,14 @@
 
 ## 执行工作目录（issue_run）
 
-- 每个 run 使用独立工作目录，不共享。
-- 默认根目录：`.agent-coder/workdirs`（可配置为 `runtime.workdir_root`）。
+- 目录分为 issue 级和 run 级两层，不混用：
+  - issue 级：`git-tree`（代码工作区）
+  - run 级：`agent/runs/<run_no>`（agent 运行态）
+- 默认根目录：`.agent-coder/workdirs`（可配置为 `work.work_dir`）。
 - 路径规范：
-  - `<workdir_root>/<project_key>/issue-<issue_iid>/run-<run_no>`
-- 推荐通过 `git worktree` 创建并在 run 结束后按策略清理。
+  - `<workdir_root>/<project_id>/<issue_id>/git-tree`
+  - `<workdir_root>/<project_id>/<issue_id>/agent/runs/<run_no>`
+- 推荐通过 `git worktree` 管理 `git-tree`，并在 run 结束后按策略清理 `agent/runs/<run_no>`。
 
 ## Issue Tracker 抽象
 
@@ -114,7 +117,8 @@
   - `base`：统一执行抽象与通用运行骨架
   - `codex`：具体 provider 实现
 - 业务层只依赖 `base.Client`，不直接依赖 `codex` 命令细节。
-- run 工作目录由 `issue_runs.workdir_path` 提供，agent 实现只负责在该目录执行。
+- agent 实现在 `issue_runs.git_tree_path` 执行代码任务，在 `issue_runs.agent_run_dir` 写入运行态文件。
+- 单次 run 的执行循环为 `dev_agent -> review_agent`，并使用 `issue_runs.agent_role`、`issue_runs.loop_step` 做扁平追踪。
 
 ## 数据库策略（SQLite + PostgreSQL）
 

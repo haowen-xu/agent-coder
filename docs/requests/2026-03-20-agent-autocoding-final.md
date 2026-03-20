@@ -82,7 +82,14 @@
   - `mr_iid`
   - `retry_count`
   - `last_error`
-  - `workdir_path`
+- `IssueRun`
+  - `run_no`
+  - `status`
+  - `agent_role`
+  - `loop_step`
+  - `max_loop_step`
+  - `git_tree_path`
+  - `agent_run_dir`
 
 ## 8. 工程实现约束
 
@@ -131,3 +138,17 @@ Agent 仅在满足以下条件时才允许进入本地系统：
 
 - `Agent Ready` 之前：本地 `issues` 表无该记录
 - `Agent Ready` 之后：先入库，再执行
+
+## 12. 单次 IssueRun 执行循环
+
+单次 run 采用固定 loop，不引入 `issue_sub_runs`：
+
+1. `dev_agent` 进行开发修改
+2. `review_agent` 进行完成度与质量检查
+3. 若检查通过，run 标记 `succeeded`
+4. 若检查不通过，`loop_step += 1` 后继续下一轮
+
+失败条件：
+
+- `loop_step > max_loop_step` 仍未通过 review，则 run 标记 `failed`
+- 出现不可恢复执行错误，则 run 标记 `failed`

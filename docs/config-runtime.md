@@ -54,20 +54,37 @@ issue_provider:
 
 工作目录根由 `work.work_dir` 配置控制。
 
-路径规范（按你的要求）：
+目录规范（按你的要求）：
 
-- `work_dir/<project_id>/<issue_id>/<run_no>/worktree`
+```text
+work_dir/
+  <project_id>/
+    <issue_id>/
+      git-tree/                 # git worktree 工作区（代码目录）
+      agent/
+        runs/
+          <run_no>/
+            input/
+            output/
+            logs/
+            meta.json
+```
 
 说明：
 
 - `project_id` / `issue_id` 均为本地数据库主键（非 slug / iid）。
 - `run_no` 用于区分同一 issue 的多次 run。
-- `issue_runs.workdir_path` 保存绝对路径，必须可追溯到上述规则。
+- 建议保存：
+  - `issues.issue_dir = work_dir/<project_id>/<issue_id>`
+  - `issue_runs.git_tree_path = .../git-tree`
+  - `issue_runs.agent_run_dir = .../agent/runs/<run_no>`
+- `git-tree` 与 `agent` 目录职责分离，避免执行临时文件污染代码工作区。
 
-推荐伴随目录：
+推荐约束：
 
-- `work_dir/<project_id>/<issue_id>/<run_no>/logs`
-- `work_dir/<project_id>/<issue_id>/<run_no>/meta.json`
+- 每个 issue 只有一个 `git-tree`。
+- 每个 run 只有一个 `agent_run_dir`。
+- run 结束后可按策略清理 `agent/runs/<run_no>`，`git-tree` 可复用。
 
 ## 4. DB 配置与 GORM 方言切换
 

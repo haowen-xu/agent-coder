@@ -69,13 +69,22 @@ internal/infra/agent/
 
 每次执行 run 时：
 
-1. 从 `issue_runs.workdir_path` 取工作目录
-2. 调用 `infra/agent` 执行一次工作提示词
-3. 记录 stdout/stderr 到 `run_logs`
-4. 根据结果更新：
-   - `issue_runs.status`
+1. 初始化 `loop_step=1`，并设置 `agent_role=dev_agent`
+2. 从 `issue_runs.git_tree_path` 取代码工作目录
+3. 从 `issue_runs.agent_run_dir` 取 run 运行目录
+4. `dev_agent` 执行开发，写 `run_logs`
+5. 切换 `agent_role=review_agent`，执行 review，写 `run_logs`
+6. 若 review 判定完成，`issue_runs.status=succeeded`
+7. 若未完成，则 `loop_step += 1` 并回到步骤 4
+8. 若 `loop_step > max_loop_step`，`issue_runs.status=failed`
+9. 同步更新：
    - `issues.lifecycle_status`
    - `issues.current_run_id`
+
+目录约定：
+
+- issue 级：`<work_dir>/<project_id>/<issue_id>/git-tree`
+- run 级：`<work_dir>/<project_id>/<issue_id>/agent/runs/<run_no>`
 
 ## 6. 配置项建议
 

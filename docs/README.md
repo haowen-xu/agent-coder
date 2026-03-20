@@ -5,6 +5,7 @@
 - [工程架构](architecture.md)
 - [数据库设计](database-schema.md)
 - [Agent 运行设计](agent-runtime.md)
+- [配置与运行时规范](config-runtime.md)
 - [需求定稿（Final）](requests/2026-03-20-agent-autocoding-final.md)
 - [实施计划（Final）](plans/2026-03-20-agent-autocoding-implementation-plan-v3-final.md)
 - [自动化执行流（Codex Plan）](automation-codex-plan.md)
