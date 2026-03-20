@@ -51,7 +51,7 @@ func New(ctx context.Context, cfg config.DBConfig, log *slog.Logger) (*Client, e
 
 	client := &Client{db: gdb, enabled: true, dialect: dialect}
 	if cfg.AutoMigrate {
-		if err := client.db.AutoMigrate(&SystemInfo{}); err != nil {
+		if err := client.db.AutoMigrate(&SystemInfo{}, &PromptTemplate{}); err != nil {
 			return nil, xerr.Infra.Wrap(err, "auto migrate")
 		}
 		if err := client.db.WithContext(ctx).

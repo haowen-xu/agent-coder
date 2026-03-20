@@ -118,7 +118,14 @@
   - `codex`：具体 provider 实现
 - 业务层只依赖 `base.Client`，不直接依赖 `codex` 命令细节。
 - agent 实现在 `issue_runs.git_tree_path` 执行代码任务，在 `issue_runs.agent_run_dir` 写入运行态文件。
-- 单次 run 的执行循环为 `dev_agent -> review_agent`，并使用 `issue_runs.agent_role`、`issue_runs.loop_step` 做扁平追踪。
+- `issue_runs` 通过 `run_kind` 区分 `dev/merge` 两类 run。
+- 单次 run 循环：
+  - `run_kind=dev`：`dev -> review`
+  - `run_kind=merge`：`merge -> review`
+- 扁平追踪字段：`issue_runs.agent_role`、`issue_runs.loop_step`。
+- Prompt 模板来源：
+  - 默认模板：`internal/infra/agent/prompts/defaults/*.md`（`go:embed`）
+  - 项目覆盖模板：数据库 `prompt_templates`（按 `project_key + run_kind + agent_role`）
 
 ## 数据库策略（SQLite + PostgreSQL）
 

@@ -43,6 +43,10 @@
 - `infra/agent/base`：定义通用 agent 调用接口和运行结果模型。
 - `infra/agent/codex`：提供 codex 命令执行与 resume 支持。
 - 保证 worker 仅依赖 `base`，不感知 provider 命令细节。
+- 增加 Prompt 管理能力：
+  - 默认 Prompt 使用 markdown 文件并通过 `go:embed` 内嵌
+  - 项目覆盖 Prompt 存储在 `prompt_templates` 表
+  - 提供 Admin API：查询默认模板、查询项目有效模板、写入/删除项目覆盖
 
 ## M4 调度与执行器
 
@@ -60,7 +64,10 @@
 - 一个 issue 一个 MR（复用更新）。
 - issue 级生成 `git-tree` 代码目录（可复用）。
 - run 级生成 `agent/runs/<run_no>` 运行目录（每次 run 独立）。
-- 单次 run 采用 `dev_agent -> review_agent` 循环。
+- 新增 `issue_runs.run_kind`：`dev/merge`。
+- 单次 run 循环：
+  - `run_kind=dev`：`dev -> review`
+  - `run_kind=merge`：`merge -> review`
 - 使用 `issue_runs.agent_role` + `issue_runs.loop_step` 扁平记录进度。
 - 当 `loop_step > max_loop_step` 仍未通过 review，run 置 `failed`。
 - 状态标签流转：
@@ -72,6 +79,7 @@
 
 ## M6 冲突处理
 
+- 合并阶段创建 `run_kind=merge` 的独立 run。
 - 自动冲突解决，重试 5 次。
 - 超限置 `failed` 并回写 issue。
 

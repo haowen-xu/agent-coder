@@ -7,6 +7,7 @@
 
 - `users` 1:N `projects`（`projects.created_by`）
 - `projects` 1:N `issues`
+- `projects` 1:N `prompt_templates`（按 `project_key` 绑定模板覆盖）
 - `issues` 1:N `issue_runs`
 - `issue_runs` 1:N `run_logs`
 
@@ -117,9 +118,10 @@ Issue 主实体与执行门禁状态。
 | id | BIGINT | PK |
 | issue_id | BIGINT | NOT NULL，FK -> issues.id |
 | run_no | INT | NOT NULL，issue 内递增序号 |
+| run_kind | VARCHAR(16) | NOT NULL，`dev/merge` |
 | trigger_type | VARCHAR(16) | NOT NULL，`scheduler/manual/rework/retry` |
 | status | VARCHAR(16) | NOT NULL，`queued/running/succeeded/failed/canceled` |
-| agent_role | VARCHAR(16) | NOT NULL，`dev_agent/review_agent/system`，表示当前或最近执行角色 |
+| agent_role | VARCHAR(16) | NOT NULL，`dev/review/merge`，表示当前或最近执行角色 |
 | loop_step | INT | NOT NULL，当前循环步（从 1 开始） |
 | max_loop_step | INT | NOT NULL，单次 run 最大循环步阈值 |
 | queued_at | TIMESTAMP | NOT NULL |
@@ -145,6 +147,7 @@ Issue 主实体与执行门禁状态。
 
 - `UNIQUE (issue_id, run_no)`
 - `INDEX (issue_id, status, created_at)`
+- `INDEX (issue_id, run_kind, status, created_at)`
 - `INDEX (status, created_at)`
 - `FOREIGN KEY (issue_id) REFERENCES issues(id)`
 - `FOREIGN KEY (created_by_user_id) REFERENCES users(id)`
@@ -173,6 +176,34 @@ Issue 主实体与执行门禁状态。
 - `INDEX (level, at)`
 - `FOREIGN KEY (run_id) REFERENCES issue_runs(id)`
 
+## 2.6 prompt_templates
+
+项目级 Prompt 覆盖表。默认 Prompt 不落库，来自代码内嵌 markdown（`go:embed`）；仅覆盖内容写入本表。
+
+| 字段 | 类型 | 约束/说明 |
+|---|---|---|
+| id | BIGINT | PK |
+| project_key | VARCHAR(64) | NOT NULL，项目键 |
+| run_kind | VARCHAR(16) | NOT NULL，`dev/merge` |
+| agent_role | VARCHAR(16) | NOT NULL，`dev/review/merge` |
+| content | TEXT | NOT NULL，markdown 模板内容 |
+| created_at | TIMESTAMP | NOT NULL |
+| updated_at | TIMESTAMP | NOT NULL |
+
+索引与约束：
+
+- `UNIQUE (project_key, run_kind, agent_role)`
+- `INDEX (project_key, run_kind)`
+
+说明：
+
+- 生效模板为“项目覆盖优先，否则回退 embedded default”。
+- 仅允许合法组合：
+  - `dev/dev`
+  - `dev/review`
+  - `merge/merge`
+  - `merge/review`
+
 ## 3. 枚举建议
 
 `issues.lifecycle_status` 建议值：
@@ -194,6 +225,17 @@ Issue 主实体与执行门禁状态。
 - `failed`
 - `canceled`
 
+`issue_runs.run_kind` 建议值：
+
+- `dev`
+- `merge`
+
+`issue_runs.agent_role` 建议值：
+
+- `dev`
+- `review`
+- `merge`
+
 ## 4. 状态机定义（细化）
 
 ## 4.1 issues.lifecycle_status
@@ -212,9 +254,9 @@ Issue 主实体与执行门禁状态。
 切换条件（主路径）：
 
 - `registered -> running`
-  - 条件：创建 `issue_runs` 记录并被 worker 拉起（`status=running`）
+  - 条件：创建 `run_kind=dev` 的 `issue_runs` 记录并被 worker 拉起（`status=running`）
 - `running -> human_review`
-  - 条件：run 成功并已创建/更新 MR，打 `Human Review` 标签
+  - 条件：`run_kind=dev` 的 run 成功并已创建/更新 MR，打 `Human Review` 标签
 - `running -> registered`
   - 条件：agent error 且 `retry_count < max_retry`，创建下一次 run 继续执行
 - `running -> failed`
@@ -225,8 +267,10 @@ Issue 主实体与执行门禁状态。
   - 条件：重新入队（新建 run）
 - `human_review -> verified`
   - 条件：人工打 `Verified` 标签
-- `verified -> merged`
-  - 条件：MR 合并成功，打 `Merged` 标签并关闭 issue
+- `verified -> running`
+  - 条件：创建 `run_kind=merge` 的 `issue_runs` 并启动自动合并
+- `running -> merged`
+  - 条件：`run_kind=merge` 的 run 成功，MR 合并完成，打 `Merged` 标签并关闭 issue
 - `* -> closed`
   - 条件：远端 issue 被关闭（轮询同步到关闭态）
 
@@ -241,14 +285,14 @@ Issue 主实体与执行门禁状态。
 
 - `queued`：已创建 run，等待 worker
 - `running`：执行中
-- `succeeded`：完成开发和验证，并成功推进到 MR 阶段
+- `succeeded`：当前 run 完成（`dev` 为完成开发评审，`merge` 为完成合并评审）
 - `failed`：执行失败（可重试）
 - `canceled`：被人工取消或被新 run 抢占
 
 切换条件：
 
 - `queued -> running`：worker 抢占任务
-- `running -> succeeded`：`review_agent` 判定“全部完成并通过”
+- `running -> succeeded`：`review` 判定“当前 run_kind 目标已完成并通过”
 - `running -> failed`：循环步超过阈值仍未完成，或出现不可继续错误
 - `queued|running -> canceled`：人工取消
 
@@ -260,16 +304,22 @@ Issue 主实体与执行门禁状态。
 
 ## 4.3 单次 run 的 agent loop 规则
 
-一次 `issue_run` 内部执行固定循环，不拆 `issue_sub_runs`：
+一次 `issue_run` 内部执行固定循环，不拆 `issue_sub_runs`。循环由 `run_kind` 决定：
 
-1. `dev_agent` 执行开发
-2. `review_agent` 执行检查
-3. 若判定完成则结束为 `succeeded`
-4. 否则 `loop_step += 1`，回到步骤 1
+- `run_kind=dev`：
+  1. `dev` 执行开发
+  2. `review` 执行检查
+  3. 若判定完成则结束为 `succeeded`
+  4. 否则 `loop_step += 1`，回到步骤 1
+- `run_kind=merge`：
+  1. `merge` 执行 rebase/merge 与冲突解决
+  2. `review` 校验是否可继续合并
+  3. 若判定完成则结束为 `succeeded`
+  4. 否则 `loop_step += 1`，回到步骤 1
 
 终止条件：
 
-- `loop_step > max_loop_step` 且 `review_agent` 仍不通过 -> `failed`
+- `loop_step > max_loop_step` 且 `review` 仍不通过 -> `failed`
 - run 过程中发生不可恢复错误 -> `failed`
 
 追踪方式（扁平化）：

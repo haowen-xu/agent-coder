@@ -84,6 +84,7 @@
   - `last_error`
 - `IssueRun`
   - `run_no`
+  - `run_kind`（`dev/merge`）
   - `status`
   - `agent_role`
   - `loop_step`
@@ -143,8 +144,23 @@ Agent 仅在满足以下条件时才允许进入本地系统：
 
 单次 run 采用固定 loop，不引入 `issue_sub_runs`：
 
-1. `dev_agent` 进行开发修改
-2. `review_agent` 进行完成度与质量检查
+角色与类型约束：
+
+- `agent_role` 仅允许：`dev/review/merge`
+- `run_kind=dev` 使用 `dev -> review`
+- `run_kind=merge` 使用 `merge -> review`
+
+`run_kind=dev` 循环：
+
+1. `dev` 进行开发修改
+2. `review` 进行完成度与质量检查
+3. 若检查通过，run 标记 `succeeded`
+4. 若检查不通过，`loop_step += 1` 后继续下一轮
+
+`run_kind=merge` 循环：
+
+1. `merge` 进行 rebase/merge 与冲突处理
+2. `review` 检查是否满足合并条件
 3. 若检查通过，run 标记 `succeeded`
 4. 若检查不通过，`loop_step += 1` 后继续下一轮
 
@@ -152,3 +168,14 @@ Agent 仅在满足以下条件时才允许进入本地系统：
 
 - `loop_step > max_loop_step` 仍未通过 review，则 run 标记 `failed`
 - 出现不可恢复执行错误，则 run 标记 `failed`
+
+## 13. Prompt 管理（默认 + 项目覆盖）
+
+- 默认 Prompt 以 markdown 文件形式放在 Go 项目中，通过 `go:embed` 内嵌。
+- 项目可在数据库配置 Prompt 覆盖（优先级高于默认模板）。
+- 覆盖维度：`project_key + run_kind + agent_role`。
+- 需要提供 Admin 接口：
+  - 查询默认模板
+  - 查询项目有效模板
+  - 写入/更新项目覆盖模板
+  - 删除项目覆盖模板（回退默认模板）
