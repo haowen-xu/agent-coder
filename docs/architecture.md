@@ -82,11 +82,30 @@
   - `migrate`：数据库迁移
   - `sync-issues`：手动触发一次 issue 同步
 
+## 执行工作目录（issue_run）
+
+- 每个 run 使用独立工作目录，不共享。
+- 默认根目录：`.agent-coder/workdirs`（可配置为 `runtime.workdir_root`）。
+- 路径规范：
+  - `<workdir_root>/<project_key>/issue-<issue_iid>/run-<run_no>`
+- 推荐通过 `git worktree` 创建并在 run 结束后按策略清理。
+
 ## Issue Tracker 抽象
 
 - 统一抽象放在 `internal/infra/issuetracker/port.go`。
 - GitLab 实现放在 `internal/infra/issuetracker/gitlab`。
 - 后续支持 GitHub 时新增同级实现目录，不改 service 层接口。
+- 轮询同步策略：仅将带 `Agent Ready` 的 issue 写入本地 `issues` 表。
+- `ProjectBinding` 中必须区分：
+  - `provider_url`：Issue Provider API endpoint
+  - `repo_url`：代码仓库地址
+- 需支持项目级标签映射配置（默认值 + 覆盖）：
+  - `Agent Ready`
+  - `In Progress`
+  - `Human Review`
+  - `Rework`
+  - `Verified`
+  - `Merged`
 
 ## 数据库策略（SQLite + PostgreSQL）
 

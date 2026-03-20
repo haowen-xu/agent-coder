@@ -22,6 +22,16 @@
 
 - `ProjectBinding` 表与 admin 管理 API。
 - 支持设置/更新 `project_key`。
+- 新增 `project_slug`（`VARCHAR`）并支持唯一性校验。
+- `issue_project_id` 改为可空字段（兼容平台差异）。
+- 新增 `provider_url`（`api_endpoint`）并设为必填，语义与 `repo_url` 分离。
+- 支持项目级标签映射配置（带默认值回退）：
+  - `label_agent_ready`
+  - `label_in_progress`
+  - `label_human_review`
+  - `label_rework`
+  - `label_verified`
+  - `label_merged`
 
 ## M3 Issue Tracker 抽象与 GitLab 实现
 
@@ -32,16 +42,28 @@
 
 - 定时 pull issue。
 - WorkItem 幂等创建与状态流转。
+- 落地 `issues.lifecycle_status` 与 `issue_runs.status` 状态机（按文档定义）。
+- 介入门禁：
+  - 仅 `Agent Ready` 的 issue 才允许写入本地 `issues` 表
+  - 先入库（registered）再允许执行开发
+  - 仅凭 `In Progress` 等标签不可触发写库和执行
 
 ## M5 自动开发 + MR
 
 - 分支命名 `agent-coder/issue-<id>`。
 - 一个 issue 一个 MR（复用更新）。
+- 每个 run 生成独立 `workdir_path`（推荐 git worktree）。
+- 状态标签流转：
+  - 开始执行 -> `In Progress`
+  - 产出 MR -> `Human Review`
+  - 人工要求返工 -> `Rework`
+  - 人工确认可合并 -> `Verified`
+  - 合并完成 -> `Merged` + 自动关闭 issue
 
 ## M6 冲突处理
 
 - 自动冲突解决，重试 5 次。
-- 超限置 `blocked` 并回写 issue。
+- 超限置 `failed` 并回写 issue。
 
 ## M7 展板只读视图
 
@@ -58,3 +80,5 @@
 - 闭环：
   - 轮询 issue -> 开发 -> MR -> 回写 issue
   - 冲突重试次数上限=5
+  - 不带 `Agent Ready` 的 issue 不会写入本地 `issues` 表
+  - 带 `Agent Ready` 的 issue 先入库后执行
