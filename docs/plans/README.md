@@ -27,3 +27,9 @@
 ## 示例
 
 可参考 [example.md](example.md)。
+
+## 当前实施计划
+
+- [2026-03-20-agent-autocoding-implementation-plan-v3-final.md](2026-03-20-agent-autocoding-implementation-plan-v3-final.md)（当前计划）
+- [2026-03-20-agent-autocoding-implementation-plan-v1.md](2026-03-20-agent-autocoding-implementation-plan-v1.md)
+- [2026-03-20-agent-autocoding-implementation-plan-v2.md](2026-03-20-agent-autocoding-implementation-plan-v2.md)
