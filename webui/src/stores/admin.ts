@@ -37,6 +37,14 @@ export interface AdminProjectRow {
   updated_at?: string
 }
 
+export interface PromptTemplate {
+  project_key?: string
+  run_kind: string
+  agent_role: string
+  source: string
+  content: string
+}
+
 export interface CreateUserInput {
   username: string
   password: string
@@ -78,6 +86,15 @@ interface ProjectsResp {
   items: AdminProjectRow[]
 }
 
+interface DefaultPromptsResp {
+  items: PromptTemplate[]
+}
+
+interface ProjectPromptsResp {
+  project_key: string
+  items: PromptTemplate[]
+}
+
 function buildProjectPayload(inProject: UpsertProjectInput) {
   return {
     ...inProject,
@@ -90,6 +107,8 @@ export const useAdminStore = defineStore('admin', () => {
   const error = ref('')
   const users = ref<AdminUserRow[]>([])
   const projects = ref<AdminProjectRow[]>([])
+  const defaultPrompts = ref<PromptTemplate[]>([])
+  const projectPrompts = ref<PromptTemplate[]>([])
 
   async function fetchUsers(token: string) {
     loading.value = true
@@ -187,16 +206,91 @@ export const useAdminStore = defineStore('admin', () => {
     }
   }
 
+  async function fetchDefaultPrompts(token: string) {
+    loading.value = true
+    error.value = ''
+    try {
+      const resp = await apiRequest<DefaultPromptsResp>('/api/v1/admin/prompts/defaults', { token })
+      defaultPrompts.value = resp.items
+    } catch (err) {
+      error.value = (err as Error).message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function fetchProjectPrompts(token: string, projectKey: string) {
+    loading.value = true
+    error.value = ''
+    try {
+      const resp = await apiRequest<ProjectPromptsResp>(`/api/v1/admin/projects/${encodeURIComponent(projectKey)}/prompts`, {
+        token,
+      })
+      projectPrompts.value = resp.items
+    } catch (err) {
+      error.value = (err as Error).message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function upsertProjectPrompt(
+    token: string,
+    projectKey: string,
+    runKind: string,
+    agentRole: string,
+    content: string,
+  ) {
+    loading.value = true
+    error.value = ''
+    try {
+      await apiRequest(`/api/v1/admin/projects/${encodeURIComponent(projectKey)}/prompts/${encodeURIComponent(runKind)}/${encodeURIComponent(agentRole)}`, {
+        method: 'PUT',
+        token,
+        body: { content },
+      })
+    } catch (err) {
+      error.value = (err as Error).message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function deleteProjectPrompt(token: string, projectKey: string, runKind: string, agentRole: string) {
+    loading.value = true
+    error.value = ''
+    try {
+      await apiRequest(`/api/v1/admin/projects/${encodeURIComponent(projectKey)}/prompts/${encodeURIComponent(runKind)}/${encodeURIComponent(agentRole)}`, {
+        method: 'DELETE',
+        token,
+      })
+    } catch (err) {
+      error.value = (err as Error).message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     loading,
     error,
     users,
     projects,
+    defaultPrompts,
+    projectPrompts,
     fetchUsers,
     createUser,
     updateUser,
     fetchProjects,
     createProject,
     updateProject,
+    fetchDefaultPrompts,
+    fetchProjectPrompts,
+    upsertProjectPrompt,
+    deleteProjectPrompt,
   }
 })

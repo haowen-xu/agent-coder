@@ -256,6 +256,78 @@
                 </el-card>
               </el-col>
             </el-row>
+
+            <el-row :gutter="16" class="panel-row">
+              <el-col :span="24">
+                <el-card class="admin-card" shadow="never">
+                  <template #header>
+                    <div class="panel-title">Prompt 管理</div>
+                  </template>
+
+                  <div class="form-inline-row mb-12">
+                    <el-select v-model="promptForm.project_key" placeholder="选择项目" filterable style="width: 240px" @change="loadProjectPrompts">
+                      <el-option
+                        v-for="row in admin.projects"
+                        :key="row.project_key"
+                        :label="`${row.project_key} (${row.name})`"
+                        :value="row.project_key"
+                      />
+                    </el-select>
+                    <el-select v-model="promptForm.run_kind" style="width: 120px" @change="onPromptRunKindChange">
+                      <el-option v-for="it in promptRunKindOptions" :key="it" :label="it" :value="it" />
+                    </el-select>
+                    <el-select v-model="promptForm.agent_role" style="width: 140px">
+                      <el-option v-for="it in promptAgentRoleOptions" :key="it" :label="it" :value="it" />
+                    </el-select>
+                    <el-button :loading="admin.loading" @click="loadProjectPrompts">加载模板</el-button>
+                    <el-tag :type="promptHasOverride ? 'warning' : 'info'" size="small">
+                      {{ promptHasOverride ? 'project_override' : 'embedded_default' }}
+                    </el-tag>
+                  </div>
+
+                  <el-row :gutter="16">
+                    <el-col :xs="24" :lg="10">
+                      <el-table :data="admin.projectPrompts" height="320" @row-click="fillPromptFromTemplate">
+                        <el-table-column label="run_kind" prop="run_kind" width="100" />
+                        <el-table-column label="agent_role" prop="agent_role" width="110" />
+                        <el-table-column label="source" prop="source" width="150" />
+                        <el-table-column label="内容预览" min-width="200">
+                          <template #default="scope">
+                            <span class="prompt-preview">{{ shortPrompt(scope.row.content) }}</span>
+                          </template>
+                        </el-table-column>
+                      </el-table>
+                    </el-col>
+                    <el-col :xs="24" :lg="14">
+                      <el-input
+                        v-model="promptForm.content"
+                        type="textarea"
+                        :rows="18"
+                        placeholder="Prompt 内容（markdown）"
+                      />
+                      <div class="form-inline-row mt-12">
+                        <el-button type="primary" :loading="admin.loading" @click="savePromptOverride">保存覆盖</el-button>
+                        <el-button :loading="admin.loading" @click="resetPromptOverride">回退默认</el-button>
+                      </div>
+                    </el-col>
+                  </el-row>
+
+                  <el-collapse class="mt-12">
+                    <el-collapse-item title="查看默认模板（embedded）" name="defaults">
+                      <el-table :data="admin.defaultPrompts" height="220">
+                        <el-table-column label="run_kind" prop="run_kind" width="100" />
+                        <el-table-column label="agent_role" prop="agent_role" width="110" />
+                        <el-table-column label="内容预览" min-width="240">
+                          <template #default="scope">
+                            <span class="prompt-preview">{{ shortPrompt(scope.row.content) }}</span>
+                          </template>
+                        </el-table-column>
+                      </el-table>
+                    </el-collapse-item>
+                  </el-collapse>
+                </el-card>
+              </el-col>
+            </el-row>
           </el-tab-pane>
         </el-tabs>
       </template>
@@ -268,6 +340,7 @@ import { ElMessage } from 'element-plus'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useBoardStore, type ProjectRow } from './stores/board'
 import {
+  type PromptTemplate,
   useAdminStore,
   type AdminProjectRow,
   type AdminUserRow,
@@ -282,6 +355,13 @@ const admin = useAdminStore()
 const activeTab = ref<'board' | 'admin'>('board')
 const isAdmin = computed(() => !!session.user?.is_admin)
 const editingProjectKey = ref('')
+const promptRunKindOptions = ['dev', 'merge']
+const promptForm = reactive({
+  project_key: '',
+  run_kind: 'dev',
+  agent_role: 'dev',
+  content: '',
+})
 
 const loginForm = reactive({
   username: 'admin',
@@ -318,6 +398,18 @@ function defaultProjectForm(): UpsertProjectInput {
 }
 
 const projectForm = reactive<UpsertProjectInput>(defaultProjectForm())
+const promptAgentRoleOptions = computed(() => {
+  if (promptForm.run_kind === 'merge') {
+    return ['merge', 'review']
+  }
+  return ['dev', 'review']
+})
+const activePrompt = computed(() =>
+  admin.projectPrompts.find(
+    (p) => p.run_kind === promptForm.run_kind && p.agent_role === promptForm.agent_role,
+  ),
+)
+const promptHasOverride = computed(() => activePrompt.value?.source === 'project_override')
 
 async function onLogin() {
   await session.login(loginForm.username, loginForm.password)
@@ -340,6 +432,11 @@ async function refreshAdmin() {
   }
   await admin.fetchUsers(session.token)
   await admin.fetchProjects(session.token)
+  await admin.fetchDefaultPrompts(session.token)
+  if (!promptForm.project_key && admin.projects.length > 0) {
+    promptForm.project_key = admin.projects[0].project_key
+  }
+  await loadProjectPrompts()
 }
 
 async function refreshAll() {
@@ -387,6 +484,85 @@ async function toggleUserAdmin(row: AdminUserRow) {
   await admin.fetchUsers(session.token)
 }
 
+function ensurePromptRole() {
+  if (!promptAgentRoleOptions.value.includes(promptForm.agent_role)) {
+    promptForm.agent_role = promptAgentRoleOptions.value[0]
+  }
+}
+
+function onPromptRunKindChange() {
+  ensurePromptRole()
+}
+
+function shortPrompt(text: string) {
+  const compact = text.replace(/\s+/g, ' ').trim()
+  if (compact.length <= 120) {
+    return compact
+  }
+  return `${compact.slice(0, 120)}...`
+}
+
+function fillPromptFromTemplate(row: PromptTemplate) {
+  promptForm.run_kind = row.run_kind
+  promptForm.agent_role = row.agent_role
+  promptForm.content = row.content
+  ensurePromptRole()
+}
+
+async function loadProjectPrompts() {
+  if (!session.token || !promptForm.project_key) {
+    admin.projectPrompts = []
+    return
+  }
+  await admin.fetchProjectPrompts(session.token, promptForm.project_key)
+  const exact = admin.projectPrompts.find(
+    (p) => p.run_kind === promptForm.run_kind && p.agent_role === promptForm.agent_role,
+  )
+  if (exact) {
+    promptForm.content = exact.content
+    return
+  }
+  if (admin.projectPrompts.length > 0) {
+    fillPromptFromTemplate(admin.projectPrompts[0])
+  } else {
+    promptForm.content = ''
+  }
+}
+
+async function savePromptOverride() {
+  if (!session.token || !promptForm.project_key) {
+    ElMessage.warning('请先选择项目')
+    return
+  }
+  if (!promptForm.content.trim()) {
+    ElMessage.warning('Prompt 内容不能为空')
+    return
+  }
+  await admin.upsertProjectPrompt(
+    session.token,
+    promptForm.project_key,
+    promptForm.run_kind,
+    promptForm.agent_role,
+    promptForm.content,
+  )
+  await loadProjectPrompts()
+  ElMessage.success('Prompt 覆盖已保存')
+}
+
+async function resetPromptOverride() {
+  if (!session.token || !promptForm.project_key) {
+    ElMessage.warning('请先选择项目')
+    return
+  }
+  if (!promptHasOverride.value) {
+    ElMessage.warning('当前组合没有项目覆盖，已是默认模板')
+    return
+  }
+  await admin.deleteProjectPrompt(session.token, promptForm.project_key, promptForm.run_kind, promptForm.agent_role)
+  await loadProjectPrompts()
+  ElMessage.success('已回退到默认模板')
+}
+
 function fillProjectForm(row: AdminProjectRow) {
   projectForm.project_key = row.project_key
   projectForm.project_slug = row.project_slug
@@ -407,12 +583,14 @@ function fillProjectForm(row: AdminProjectRow) {
   projectForm.label_merged = row.label_merged
 }
 
-function onAdminProjectRowChange(row: AdminProjectRow | null) {
+async function onAdminProjectRowChange(row: AdminProjectRow | null) {
   if (!row) {
     return
   }
   editingProjectKey.value = row.project_key
   fillProjectForm(row)
+  promptForm.project_key = row.project_key
+  await loadProjectPrompts()
 }
 
 function resetProjectForm() {
@@ -433,6 +611,9 @@ async function saveProject() {
   }
   await admin.fetchProjects(session.token)
   await board.fetchProjects(session.token)
+  if (!promptForm.project_key && admin.projects.length > 0) {
+    promptForm.project_key = admin.projects[0].project_key
+  }
 }
 
 onMounted(async () => {
@@ -540,6 +721,12 @@ onMounted(async () => {
 .editing-tip {
   color: #5f6b7a;
   font-size: 12px;
+}
+
+.prompt-preview {
+  color: #5f6b7a;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .mb-12 {
