@@ -38,7 +38,7 @@ go test ./...
 
 ### 组件与状态
 
-- 页面级组件放 `webui/src/App.vue` 或后续 `views/*`。
+- 页面级组件统一放 `webui/src/views/*`，`App.vue` 仅做布局或路由容器。
 - 跨组件状态统一放 `webui/src/stores/*`（Pinia）。
 - store 负责数据请求和状态变更，组件负责展示与交互。
 
@@ -64,4 +64,5 @@ cd webui && pnpm build
 
 - 一个 PR/提交聚焦一个目标，避免混入无关改动。
 - 文档、代码、配置保持同步更新。
-- 自动化流程当前仅使用 `scripts/run_codex_on_plan.py`，`scripts/agents/` 暂不纳入标准流程。
+- 自动化流程当前仅使用 `scripts/run_codex_on_plan.py`。
+- 仓库内不再维护内置 agents 脚本，统一由外部 Agent-Coder 管理。

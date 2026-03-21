@@ -21,7 +21,8 @@
 
 - Agent 抽象在 `internal/infra/agent/base`。
 - 当前已实现 `internal/infra/agent/codex`。
-- 支持常规执行与 resume，结合 `issue_runs` 的 `run_kind/agent_role/loop_step` 推进循环。
+- Worker 当前使用常规执行接口（`Run`）推进 `issue_runs` 的 `run_kind/agent_role/loop_step` 循环。
+- `codex resume` 仅用于计划自动化脚本 `scripts/run_codex_on_plan.py`，不在 worker 主流程中启用。
 
 ## 工作流（核心）
 

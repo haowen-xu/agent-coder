@@ -1,19 +1,19 @@
-# 工程架构（目标版）
+# 工程架构（当前实现）
 
 ## 技术栈
 
 - 后端：Go、Hertz、Cobra、Viper、slog、errorx、GORM
 - 数据库：SQLite / PostgreSQL（同一套 GORM DAL）
 - 前端：pnpm、Vite、Vue3、Pinia、Element Plus
+- 自动化脚本：Python（`scripts/run_codex_on_plan.py`）
 
 ## 分层原则
 
-- `handler -> service -> dal` 单向依赖。
-- `infra` 提供外部系统实现（gitlab、git、scheduler、secret、db），由 `app` 组装注入。
-- `cmds` 仅负责命令入口，不承载业务逻辑。
-- 仓库协作平台密钥通过 `infra/secret` 读取（默认 env provider），项目仅保存 `credential_ref`。
+- 依赖方向保持单向：`handler -> service -> dal`。
+- `infra` 提供外部系统能力（repo provider、agent、git、secret），由 `app` 组装注入。
+- `cmds` 仅承担进程入口和参数装配，不承载业务决策。
 
-## 目标目录结构
+## 核心目录结构（当前）
 
 ```text
 .
@@ -35,21 +35,13 @@
 │   │   ├── project_repo.go
 │   │   ├── issue_repo.go
 │   │   ├── run_repo.go
+│   │   ├── metrics_repo.go
 │   │   └── prompt_template.go
 │   ├── handler/
 │   │   └── httpserver/
-│   │       ├── server.go
-│   │       ├── auth_handlers.go
-│   │       ├── admin_handlers.go
-│   │       ├── board_handlers.go
-│   │       ├── middleware.go
-│   │       ├── static.go
-│   │       └── static/
 │   ├── service/
 │   │   ├── core/
-│   │   │   └── service.go
 │   │   └── worker/
-│   │       └── service.go
 │   ├── infra/
 │   │   ├── agent/
 │   │   │   ├── base/
@@ -57,15 +49,10 @@
 │   │   │   ├── prompts/
 │   │   │   └── promptstore/
 │   │   ├── git/
-│   │   │   └── client.go
-│   │   └── repo/
-│   │       ├── common/
-│   │       │   ├── port.go
-│   │       │   ├── types.go
-│   │       │   └── errors.go
-│   │       └── gitlab/
-│   │           ├── client.go
-│   │           └── api_types.go
+│   │   ├── repo/
+│   │   │   ├── common/
+│   │   │   └── gitlab/
+│   │   └── secret/
 │   ├── logger/
 │   └── xerr/
 ├── webui/
@@ -73,79 +60,57 @@
 └── docs/
 ```
 
-## 命令体系（Cobra）
+## 命令入口（Cobra）
 
-- `cmds/main.go` 是唯一入口，执行 `Execute()` 并挂载所有子命令。
-- `cmds/root.go` 挂载全局参数（配置文件、日志级别等）。
-- 子命令：
-  - `server`：启动 API 服务
-  - `worker`：启动轮询与执行器
-  - `migrate`：数据库迁移
-  - `sync-issues`：手动触发一次 issue 同步
+- `go run ./cmds server --config config.yaml`：启动 API 服务 + 静态资源。
+- `go run ./cmds worker --config config.yaml`：启动轮询与执行循环。
+- `go run ./cmds migrate --config config.yaml`：执行数据库迁移。
+- `go run ./cmds sync-issues --config config.yaml`：手动触发一次 issue 同步。
 
-## 执行工作目录（issue_run）
+## HTTP 路由分组
 
-- 目录分为 issue 级和 run 级两层，不混用：
-  - issue 级：`git-tree`（代码工作区）
-  - run 级：`agent/runs/<run_no>`（agent 运行态）
-- 默认根目录：`.agent-coder/workdirs`（可配置为 `work.work_dir`）。
-- 路径规范：
-  - `<workdir_root>/<project_id>/<issue_id>/git-tree`
-  - `<workdir_root>/<project_id>/<issue_id>/agent/runs/<run_no>`
-- 推荐通过 `git worktree` 管理 `git-tree`，并在 run 结束后按策略清理 `agent/runs/<run_no>`。
+- 公共：`GET /healthz`、`GET /api/v1/meta`、`POST /api/v1/auth/login`
+- 登录后：
+  - `GET /api/v1/auth/me`
+  - `GET /api/v1/board/projects`
+  - `GET /api/v1/board/projects/:projectKey/issues`
+- 管理端（admin）：
+  - 用户：`/api/v1/admin/users`
+  - 项目：`/api/v1/admin/projects`
+  - Prompt：`/api/v1/admin/prompts/defaults`、`/api/v1/admin/projects/:projectKey/prompts/*`
+  - 运行态：`/api/v1/admin/issues/:issueID/runs`、`/api/v1/admin/runs/:runID/logs` 等
 
-## 仓库协作平台抽象
+## Worker 执行模型
 
-- 统一抽象放在 `internal/infra/repo/common/port.go`。
-- GitLab 实现放在 `internal/infra/repo/gitlab`。
-- 后续支持 GitHub 时新增同级实现目录，不改 service 层接口。
-- 轮询同步策略：仅将带 `Agent Ready` 的 issue 写入本地 `issues` 表。
-- `ProjectBinding` 中必须区分：
-  - `provider_url`：仓库协作平台 API endpoint
-  - `repo_url`：代码仓库地址
-- 需支持项目级标签映射配置（默认值 + 覆盖）：
-  - `Agent Ready`
-  - `In Progress`
-  - `Human Review`
-  - `Rework`
-  - `Verified`
-  - `Merged`
-
-## Agent 执行抽象
-
-- 归属层级：`internal/infra/agent`
-- 分层：
-  - `base`：统一执行抽象与通用运行骨架
-  - `codex`：具体 provider 实现
-- 业务层只依赖 `base.Client`，不直接依赖 `codex` 命令细节。
-- agent 实现在 `issue_runs.git_tree_path` 执行代码任务，在 `issue_runs.agent_run_dir` 写入运行态文件。
-- `issue_runs` 通过 `run_kind` 区分 `dev/merge` 两类 run。
+- 调度来源：扫描 `issues`，为可执行 issue 创建 `issue_runs`（`dev` 或 `merge`）。
 - 单次 run 循环：
   - `run_kind=dev`：`dev -> review`
   - `run_kind=merge`：`merge -> review`
-- 扁平追踪字段：`issue_runs.agent_role`、`issue_runs.loop_step`。
-- Prompt 模板来源：
-  - 默认模板：`internal/infra/agent/prompts/defaults/*.md`（`go:embed`）
-  - 项目覆盖模板：数据库 `prompt_templates`（按 `project_key + run_kind + agent_role`）
+- 判定规则：
+  - `review.pass` -> 当前 run 成功
+  - 超过 `max_loop_step` 或主流程 `blocked/error` -> 当前 run 失败
+- 完成后推进 issue 生命周期，并与远端标签 / MR / issue 状态同步。
 
-## 数据库策略（SQLite + PostgreSQL）
+## 工作目录
 
-- 只维护一个 GORM 实现，不拆双 DAL。
-- DB Client 维护 `sqlDialect string`（`sqlite`/`postgres`）。
-- 仅在方言敏感点做 `switch`（如 upsert、锁、少量原生 SQL）。
-- 常规 CRUD 统一走 GORM 兼容层。
+- 根目录：`work.work_dir`（默认 `.agent-coder/workdirs`）
+- issue 级代码目录：`<root>/<project_id>/<issue_id>/git-tree`
+- run 级目录：`<root>/<project_id>/<issue_id>/agent/runs/<run_no>`
 
-## WebUI 挂载策略（go:embed）
+## 仓库协作平台与密钥
 
-- `webui` 构建产物输出到 `internal/handler/httpserver/static/`。
-- Go 侧使用 `go:embed` 打包 static 目录。
-- HTTP 服务统一挂载：
-  - `/api/*` -> 后端接口
-  - 其他路由 -> WebUI `index.html`（SPA fallback）
+- provider 抽象：`internal/infra/repo/common`
+- 当前实现：`internal/infra/repo/gitlab`
+- 项目保存 `credential_ref` 或 `project_token`，密钥读取走 `infra/secret`。
 
-## 运行入口
+## Agent 抽象
 
-- 后端：`go run ./cmds server --config config.yaml`
-- Worker：`go run ./cmds worker --config config.yaml`
-- 前端：`cd webui && pnpm dev`
-- 计划执行器：`python3 scripts/run_codex_on_plan.py --plan-file ...`
+- 业务层依赖 `base.Client` 接口，不绑定具体 provider。
+- 当前 provider：`infra/agent/codex`
+- Prompt 来源：embedded defaults + 项目级覆盖（`prompt_templates`）
+
+## 自动化脚本范围
+
+- 自动化计划执行当前仅支持 `scripts/run_codex_on_plan.py`。
+- 仓库内不再维护内置 agents 脚本，统一由外部 Agent-Coder 管理。
+- Autofix 产物目录统一使用 `.ai-docs/autofix/`。

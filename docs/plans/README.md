@@ -1,8 +1,8 @@
 # 计划文件规范
 
-`scripts/run_codex_on_plan.py` 不解析计划结构本身，而是把计划文件路径交给 codex 读取执行。
+`scripts/run_codex_on_plan.py` 不解析计划结构本身，而是将计划文件路径直接交给 codex 执行。
 
-为提高执行稳定性，建议计划文件使用以下结构：
+## 建议结构
 
 ```markdown
 # 任务标题
@@ -26,10 +26,13 @@
 
 ## 示例
 
-可参考 [example.md](example.md)。
+- 计划示例：[`example.md`](example.md)
 
-## 当前实施计划
+## 当前计划
 
-- [2026-03-20-agent-autocoding-implementation-plan-v3-final.md](2026-03-20-agent-autocoding-implementation-plan-v3-final.md)（当前计划）
-- [2026-03-20-agent-autocoding-implementation-plan-v1.md](2026-03-20-agent-autocoding-implementation-plan-v1.md)
-- [2026-03-20-agent-autocoding-implementation-plan-v2.md](2026-03-20-agent-autocoding-implementation-plan-v2.md)
+- [`2026-03-20-agent-autocoding-implementation-plan-v3-final.md`](2026-03-20-agent-autocoding-implementation-plan-v3-final.md)
+
+## 清理策略
+
+- 目录仅保留“当前可执行”计划。
+- 历史迭代版本（如 `v1/v2`）默认清理，必要时通过 Git 历史追溯。

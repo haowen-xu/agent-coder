@@ -1,12 +1,12 @@
 # 配置与本地工作区规范
 
-> 本文档定义 `config.yaml`、`config` 包运行时行为、工作目录布局以及 DB 方言切换约束。
+> 本文档以当前 `internal/config/config.go` 与 worker 实现为准。
 
 ## 1. 统一配置文件
 
-系统使用单一 `config.yaml`，由 Viper 加载。
+系统使用单一 `config.yaml`，由 Viper 加载并做默认值填充 + 校验。
 
-示例：
+示例（与 `config.example.yaml` 一致）：
 
 ```yaml
 app:
@@ -16,6 +16,14 @@ app:
 server:
   host: 0.0.0.0
   port: 8080
+  read_timeout: 15s
+  write_timeout: 15s
+  shutdown_timeout: 10s
+
+log:
+  level: info
+  format: text # text | json
+  add_source: false
 
 db:
   enabled: true
@@ -30,6 +38,9 @@ db:
 secret:
   provider: env
   env_prefix: AGENT_CODER_SECRET_
+
+auth:
+  session_ttl: 72h
 
 work:
   work_dir: .agent-coder/workdirs
@@ -48,7 +59,8 @@ scheduler:
   poll_interval_sec: 30
   run_every: 30s
 
-repo_provider:
+# 兼容字段（推荐改为 repo_provider）
+issue_provider:
   http_timeout_sec: 30
 
 bootstrap:
@@ -56,82 +68,72 @@ bootstrap:
   admin_password: admin123
 ```
 
-## 2. config 包与热更新预留
+## 2. config 包运行时行为
 
-`internal/config` 包使用原子指针保存当前配置快照：
+`internal/config` 使用原子指针保存当前配置快照：
 
-- `var cfgPtr atomic.Pointer[Config]`
-- `Current() *Config`：读取当前快照
-- `Replace(*Config)`：原子替换
+- `Current() *Config`：读取快照
+- `Replace(*Config)`：替换快照
 
 约束：
 
-- 业务代码只读配置快照，不可修改原对象。
-- 配置重载时必须 `Load -> Validate -> Replace`，失败不覆盖旧配置。
-- 先实现静态加载，再预留 `WatchConfig` 热更新入口。
+- 业务层只读配置，不直接修改配置对象。
+- 加载流程固定为 `Load -> Validate -> Store`。
+- 校验失败时不得覆盖旧配置。
 
-## 3. 本地工作区目录
+## 3. 关键校验规则
 
-工作目录根由 `work.work_dir` 配置控制。
+- `server.port` 必须在 `1~65535`
+- `server.read_timeout/write_timeout/shutdown_timeout` 必须是合法 duration
+- `db.conn_max_lifetime` 必须是合法 duration
+- `db.driver=sqlite` 时要求 `db.sqlite_path`
+- `db.driver=postgres` 时要求 `db.postgres_dsn`
+- `agent.codex.timeout_sec/max_retry/max_loop_step` 必须大于 0
+- `bootstrap.admin_username/admin_password` 不可为空
 
-目录规范（按你的要求）：
+## 4. 仓库平台超时配置兼容
+
+当前优先级：
+
+1. `repo_provider.http_timeout_sec`
+2. `issue_provider.http_timeout_sec`（兼容旧配置）
+3. 默认值 `30`
+
+说明：新配置建议统一使用 `repo_provider`。
+
+## 5. 本地工作区目录
+
+根目录由 `work.work_dir` 控制，worker 目录约定：
 
 ```text
-work_dir/
+<work_dir>/
   <project_id>/
     <issue_id>/
-      git-tree/                 # git worktree 工作区（代码目录）
+      git-tree/
       agent/
         runs/
           <run_no>/
-            input/
-            output/
-            logs/
-            meta.json
 ```
 
-说明：
+字段映射：
 
-- `project_id` / `issue_id` 均为本地数据库主键（非 slug / iid）。
-- `run_no` 用于区分同一 issue 的多次 run。
-- 建议保存：
-  - `issues.issue_dir = work_dir/<project_id>/<issue_id>`
-  - `issue_runs.git_tree_path = .../git-tree`
-  - `issue_runs.agent_run_dir = .../agent/runs/<run_no>`
-- `git-tree` 与 `agent` 目录职责分离，避免执行临时文件污染代码工作区。
+- `issues.issue_dir = <work_dir>/<project_id>/<issue_id>`
+- `issue_runs.git_tree_path = <issue_dir>/git-tree`
+- `issue_runs.agent_run_dir = <issue_dir>/agent/runs/<run_no>`
 
-推荐约束：
+## 6. Agent sandbox 行为说明
 
-- 每个 issue 只有一个 `git-tree`。
-- 每个 run 只有一个 `agent_run_dir`。
-- run 结束后可按策略清理 `agent/runs/<run_no>`，`git-tree` 可复用。
+`agent.codex.sandbox` 是 provider 初始化参数；worker 实际按角色决定是否启用 sandbox：
 
-## 4. DB 配置与 GORM 方言切换
+- `dev` / `merge`：固定关闭
+- `review`：受项目配置 `projects.sandbox_plan_review` 控制
 
-系统仅维护一套 GORM 实现，通过 `db.driver` 选择方言：
+因此，排查 sandbox 行为时需同时看全局配置与项目配置。
 
-- `sqlite` -> `gorm.io/driver/sqlite`
-- `postgres` -> `gorm.io/driver/postgres`
+## 7. 密钥读取约束
 
-运行时 DB client 维护：
-
-- `sqlDialect string`（`sqlite` / `postgres`）
-
-规则：
-
-- 常规 CRUD 统一用 GORM 兼容写法。
-- 仅在方言敏感点按 `sqlDialect` 分支（如 upsert/锁/少量原生 SQL）。
-- `db.driver/sqlite_path/postgres_dsn` 变更默认视为“需重启”项，不做在线热切换。
-
-## 5. 密钥读取约束
-
-- `projects.credential_ref` 保存密钥引用名，不直接存 token。
-- `secret.provider=env` 时，读取环境变量：
-  - key 格式：`<env_prefix><SANITIZED_REF>`
-  - 默认前缀：`AGENT_CODER_SECRET_`
-- `SANITIZED_REF` 规则：转大写，非字母数字字符替换为 `_`。
-
-兼容说明：
-
-- 历史配置键 `issue_provider.http_timeout_sec` 仍可用。
-- 新配置建议统一使用 `repo_provider.http_timeout_sec`。
+- 项目优先使用 `project_token`（若设置）。
+- 未设置时使用 `credential_ref` 通过 secret manager 读取。
+- `secret.provider=env` 时环境变量键格式：
+  - `<env_prefix><SANITIZED_REF>`
+  - `SANITIZED_REF`：大写且非字母数字替换为 `_`
