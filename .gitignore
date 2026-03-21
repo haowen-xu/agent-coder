@@ -10,6 +10,7 @@ coverage.out
 *.db
 *.log
 .agent-coder/
+issue-drafts/
 __pycache__/
 *.pyc
 

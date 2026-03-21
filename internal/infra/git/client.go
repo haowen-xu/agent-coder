@@ -3,6 +3,7 @@ package git
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net/url"
 	"os"
@@ -18,6 +19,7 @@ import (
 type Client struct{}
 
 var sensitiveURLPattern = regexp.MustCompile(`https?://[^\s'"]+`)
+var sensitiveGitAuthHeaderPattern = regexp.MustCompile(`(?i)(http\.extraHeader=authorization:\s*basic\s+)[^\s'"]+`)
 
 // NewClient 执行相关逻辑。
 func NewClient() *Client {
@@ -25,11 +27,17 @@ func NewClient() *Client {
 }
 
 // EnsureProjectRepo 是 *Client 的方法实现。
-func (c *Client) EnsureProjectRepo(ctx context.Context, repoRoot string, repoURL string, projectKey string) (string, error) {
+func (c *Client) EnsureProjectRepo(
+	ctx context.Context,
+	repoRoot string,
+	repoURL string,
+	projectKey string,
+	token string,
+) (string, error) {
 	projectKey = sanitizePathPart(projectKey)
 	repoPath := filepath.Join(repoRoot, "_repos", projectKey)
 	if _, err := os.Stat(filepath.Join(repoPath, ".git")); err == nil {
-		if _, runErr := c.run(ctx, repoPath, "fetch", "--all", "--prune"); runErr != nil {
+		if _, runErr := c.runWithToken(ctx, repoPath, token, "fetch", "--all", "--prune"); runErr != nil {
 			return "", runErr
 		}
 		return repoPath, nil
@@ -38,7 +46,7 @@ func (c *Client) EnsureProjectRepo(ctx context.Context, repoRoot string, repoURL
 	if err := os.MkdirAll(filepath.Dir(repoPath), 0o755); err != nil {
 		return "", xerr.Infra.Wrap(err, "mkdir repo root")
 	}
-	if _, err := c.run(ctx, "", "clone", repoURL, repoPath); err != nil {
+	if _, err := c.runWithToken(ctx, "", token, "clone", repoURL, repoPath); err != nil {
 		return "", err
 	}
 	return repoPath, nil
@@ -51,13 +59,14 @@ func (c *Client) EnsureIssueWorktree(
 	worktreePath string,
 	branch string,
 	defaultBranch string,
+	token string,
 ) error {
 	if err := os.MkdirAll(filepath.Dir(worktreePath), 0o755); err != nil {
 		return xerr.Infra.Wrap(err, "mkdir worktree parent")
 	}
 	_ = os.RemoveAll(worktreePath)
 
-	if _, err := c.run(ctx, repoPath, "fetch", "origin", "--prune"); err != nil {
+	if _, err := c.runWithToken(ctx, repoPath, token, "fetch", "origin", "--prune"); err != nil {
 		return err
 	}
 
@@ -65,8 +74,8 @@ func (c *Client) EnsureIssueWorktree(
 	issueRemoteRef := "refs/remotes/origin/" + branch
 	if ok, _ := c.localRefExists(ctx, repoPath, issueRemoteRef); ok {
 		baseRef = "origin/" + branch
-	} else if ok, _ := c.remoteBranchExists(ctx, repoPath, branch); ok {
-		_, _ = c.run(ctx, repoPath, "fetch", "origin", branch+":"+issueRemoteRef)
+	} else if ok, _ := c.remoteBranchExists(ctx, repoPath, branch, token); ok {
+		_, _ = c.runWithToken(ctx, repoPath, token, "fetch", "origin", branch+":"+issueRemoteRef)
 		if localOK, _ := c.localRefExists(ctx, repoPath, issueRemoteRef); localOK {
 			baseRef = "origin/" + branch
 		}
@@ -76,8 +85,8 @@ func (c *Client) EnsureIssueWorktree(
 		defaultRemoteRef := "refs/remotes/origin/" + defaultBranch
 		if ok, _ := c.localRefExists(ctx, repoPath, defaultRemoteRef); ok {
 			baseRef = "origin/" + defaultBranch
-		} else if ok, _ := c.remoteBranchExists(ctx, repoPath, defaultBranch); ok {
-			_, _ = c.run(ctx, repoPath, "fetch", "origin", defaultBranch+":"+defaultRemoteRef)
+		} else if ok, _ := c.remoteBranchExists(ctx, repoPath, defaultBranch, token); ok {
+			_, _ = c.runWithToken(ctx, repoPath, token, "fetch", "origin", defaultBranch+":"+defaultRemoteRef)
 			if localOK, _ := c.localRefExists(ctx, repoPath, defaultRemoteRef); localOK {
 				baseRef = "origin/" + defaultBranch
 			}
@@ -109,8 +118,8 @@ func (c *Client) localRefExists(ctx context.Context, repoPath string, ref string
 }
 
 // TryMergeDefault 是 *Client 的方法实现。
-func (c *Client) TryMergeDefault(ctx context.Context, worktreePath string, defaultBranch string) (bool, string, error) {
-	if _, err := c.run(ctx, worktreePath, "fetch", "origin", "--prune"); err != nil {
+func (c *Client) TryMergeDefault(ctx context.Context, worktreePath string, defaultBranch string, token string) (bool, string, error) {
+	if _, err := c.runWithToken(ctx, worktreePath, token, "fetch", "origin", "--prune"); err != nil {
 		return false, "", err
 	}
 	out, err := c.run(ctx, worktreePath, "merge", "--no-ff", "--no-edit", "origin/"+defaultBranch)
@@ -148,9 +157,20 @@ func (c *Client) CommitAll(ctx context.Context, worktreePath string, message str
 }
 
 // PushBranch 是 *Client 的方法实现。
-func (c *Client) PushBranch(ctx context.Context, worktreePath string, branch string) error {
-	_, err := c.run(ctx, worktreePath, "push", "-u", "origin", branch)
+func (c *Client) PushBranch(ctx context.Context, worktreePath string, branch string, token string) error {
+	_, err := c.runWithToken(ctx, worktreePath, token, "push", "-u", "origin", branch)
 	return err
+}
+
+// runWithToken 是 *Client 的方法实现。
+func (c *Client) runWithToken(ctx context.Context, dir string, token string, args ...string) (string, error) {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return c.run(ctx, dir, args...)
+	}
+	authHeader := "Authorization: Basic " + base64.StdEncoding.EncodeToString([]byte("oauth2:"+token))
+	cmdArgs := append([]string{"-c", "http.extraHeader=" + authHeader}, args...)
+	return c.run(ctx, dir, cmdArgs...)
 }
 
 // run 是 *Client 的方法实现。
@@ -168,14 +188,14 @@ func (c *Client) run(ctx context.Context, dir string, args ...string) (string, e
 		if out == "" {
 			out = err.Error()
 		}
-		return out, xerr.Infra.New("git %s failed: %s", maskSensitiveURL(strings.Join(args, " ")), maskSensitiveURL(out))
+		return out, xerr.Infra.New("git %s failed: %s", maskSensitive(strings.Join(args, " ")), maskSensitive(out))
 	}
 	return strings.TrimSpace(stdout.String() + "\n" + stderr.String()), nil
 }
 
 // remoteBranchExists 是 *Client 的方法实现。
-func (c *Client) remoteBranchExists(ctx context.Context, repoPath string, branch string) (bool, error) {
-	out, err := c.run(ctx, repoPath, "ls-remote", "--heads", "origin", branch)
+func (c *Client) remoteBranchExists(ctx context.Context, repoPath string, branch string, token string) (bool, error) {
+	out, err := c.runWithToken(ctx, repoPath, token, "ls-remote", "--heads", "origin", branch)
 	if err != nil {
 		return false, err
 	}
@@ -210,4 +230,10 @@ func maskSensitiveURL(input string) string {
 		parsed.User = url.UserPassword(username, "****")
 		return parsed.String()
 	})
+}
+
+// maskSensitive 会对 URL userinfo 和命令行中的认证头进行脱敏。
+func maskSensitive(input string) string {
+	masked := maskSensitiveURL(input)
+	return sensitiveGitAuthHeaderPattern.ReplaceAllString(masked, "${1}****")
 }

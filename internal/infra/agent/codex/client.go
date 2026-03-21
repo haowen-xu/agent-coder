@@ -89,8 +89,18 @@ func (c *Client) Run(ctx context.Context, req base.InvokeRequest) (*base.InvokeR
 
 	out := string(stdout)
 	decision := parseDecision(out)
+	if err != nil && decision.Decision != "blocked" {
+		decision.Decision = "blocked"
+		decision.Role = strings.TrimSpace(req.Role)
+		if strings.TrimSpace(decision.Summary) == "" {
+			decision.Summary = "codex execution failed"
+		}
+		if strings.TrimSpace(decision.BlockingReason) == "" {
+			decision.BlockingReason = fallbackReason(stderr, out)
+		}
+	}
 	if decision.Decision == "" {
-		decision = fallbackDecision(req.Role, stderr)
+		decision = fallbackDecision(req.Role, fallbackReason(stderr, out))
 	}
 
 	result := &base.InvokeResult{
@@ -123,27 +133,24 @@ func parseDecision(out string) base.Decision {
 // fallbackDecision 执行相关逻辑。
 func fallbackDecision(role string, reason string) base.Decision {
 	role = strings.TrimSpace(role)
-	if role == "review" {
-		return base.Decision{
-			Role:           role,
-			Decision:       "pass",
-			Summary:        "fallback review pass",
-			BlockingReason: strings.TrimSpace(reason),
-		}
-	}
-	if reason != "" {
-		return base.Decision{
-			Role:           role,
-			Decision:       "blocked",
-			Summary:        "codex execution failed",
-			BlockingReason: reason,
-		}
-	}
 	return base.Decision{
-		Role:     role,
-		Decision: "ready_for_review",
-		Summary:  "fallback ready_for_review",
+		Role:           role,
+		Decision:       "blocked",
+		Summary:        "codex result parse failed",
+		BlockingReason: strings.TrimSpace(reason),
 	}
+}
+
+// fallbackReason 执行相关逻辑。
+func fallbackReason(stderr string, stdout string) string {
+	reason := strings.TrimSpace(stderr)
+	if reason != "" {
+		return reason
+	}
+	if strings.Contains(stdout, "RESULT_JSON") {
+		return "failed to parse RESULT_JSON"
+	}
+	return "missing RESULT_JSON in codex output"
 }
 
 // exitStatus 执行相关逻辑。

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -36,6 +35,12 @@ type Service struct {
 	secret     secret.Manager       // secret 字段说明。
 	lastPolled map[uint]time.Time   // lastPolled 字段说明。
 }
+
+const (
+	issueNoteMarkerRunStatus   = "<!-- agent-coder:run-status -->"
+	issueNoteMarkerMergeStatus = "<!-- agent-coder:merge-status -->"
+	issueNoteMarkerMRReady     = "<!-- agent-coder:mr-ready -->"
+)
 
 // New 执行相关逻辑。
 func New(
@@ -292,6 +297,10 @@ func (s *Service) executeRun(ctx context.Context, run *db.IssueRun) error {
 	if project == nil {
 		return nil
 	}
+	repoToken, err := s.repoAuthToken(ctx, *project)
+	if err != nil {
+		return err
+	}
 	repoClient, err := s.newRepoClient(*project)
 	if err != nil {
 		return err
@@ -302,11 +311,11 @@ func (s *Service) executeRun(ctx context.Context, run *db.IssueRun) error {
 		now := time.Now()
 		run.StartedAt = &now
 	}
-	repoPath, err := s.git.EnsureProjectRepo(ctx, s.cfg.Work.WorkDir, authRepoURL(*project), project.ProjectKey)
+	repoPath, err := s.git.EnsureProjectRepo(ctx, s.cfg.Work.WorkDir, strings.TrimSpace(project.RepoURL), project.ProjectKey, repoToken)
 	if err != nil {
 		return err
 	}
-	if err := s.git.EnsureIssueWorktree(ctx, repoPath, run.GitTreePath, run.BranchName, project.DefaultBranch); err != nil {
+	if err := s.git.EnsureIssueWorktree(ctx, repoPath, run.GitTreePath, run.BranchName, project.DefaultBranch, repoToken); err != nil {
 		return err
 	}
 	if err := os.MkdirAll(run.GitTreePath, 0o755); err != nil {
@@ -322,7 +331,7 @@ func (s *Service) executeRun(ctx context.Context, run *db.IssueRun) error {
 	_ = repoClient.SetIssueLabels(ctx, *project, issue.IssueIID, []string{project.LabelAgentReady, project.LabelInProgress})
 
 	if run.RunKind == db.RunKindMerge {
-		conflict, mergeOut, mergeErr := s.git.TryMergeDefault(ctx, run.GitTreePath, project.DefaultBranch)
+		conflict, mergeOut, mergeErr := s.git.TryMergeDefault(ctx, run.GitTreePath, project.DefaultBranch, repoToken)
 		if mergeErr != nil {
 			run.Status = db.RunStatusFailed
 			run.ErrorSummary = stringPtr(mergeErr.Error())
@@ -387,7 +396,7 @@ func (s *Service) executeRun(ctx context.Context, run *db.IssueRun) error {
 		}
 		_ = s.appendDecisionLog(ctx, run.ID, "agent", db.AgentRoleReview, reviewRes.Decision)
 		if reviewRes.Decision.Decision == "pass" {
-			if err := s.autoCommitAndPush(ctx, issue, run); err != nil {
+			if err := s.autoCommitAndPush(ctx, issue, run, repoToken); err != nil {
 				lastErr = err.Error()
 				failed = true
 				break
@@ -416,39 +425,6 @@ func (s *Service) executeRun(ctx context.Context, run *db.IssueRun) error {
 	}
 
 	return s.finalizeIssue(ctx, repoClient, *project, issue, run, failed, lastErr)
-}
-
-// authRepoURL 根据项目 token 构造可用于 git clone/fetch/push 的仓库地址。
-func authRepoURL(project db.Project) string {
-	repoURL := strings.TrimSpace(project.RepoURL)
-	if repoURL == "" || project.ProjectToken == nil {
-		return repoURL
-	}
-
-	token := strings.TrimSpace(*project.ProjectToken)
-	if token == "" {
-		return repoURL
-	}
-
-	parsed, err := url.Parse(repoURL)
-	if err != nil {
-		return repoURL
-	}
-	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return repoURL
-	}
-	if parsed.Host == "" {
-		return repoURL
-	}
-
-	username := "oauth2"
-	if parsed.User != nil {
-		if existing := strings.TrimSpace(parsed.User.Username()); existing != "" {
-			username = existing
-		}
-	}
-	parsed.User = url.UserPassword(username, token)
-	return parsed.String()
 }
 
 // newRepoClient 是 *Service 的方法实现。
@@ -484,7 +460,7 @@ func (s *Service) finalizeIssue(
 			issue.LifecycleStatus = db.IssueLifecycleRegistered
 		}
 		issue.CloseReason = nil
-		_ = repoClient.CreateIssueNote(ctx, project, issue.IssueIID, "agent run failed: "+lastErr)
+		s.upsertIssueNote(ctx, repoClient, project, issue.IssueIID, issueNoteMarkerRunStatus, "agent run failed: "+lastErr)
 		return s.db.SaveIssue(ctx, issue)
 	}
 
@@ -504,7 +480,7 @@ func (s *Service) finalizeIssue(
 			if saveErr := s.db.SaveRun(ctx, run); saveErr != nil {
 				return saveErr
 			}
-			_ = repoClient.CreateIssueNote(ctx, project, issue.IssueIID, "failed to create/update MR: "+err.Error())
+			s.upsertIssueNote(ctx, repoClient, project, issue.IssueIID, issueNoteMarkerRunStatus, "failed to create/update MR: "+err.Error())
 			return s.db.SaveIssue(ctx, issue)
 		}
 		if mr != nil {
@@ -521,7 +497,7 @@ func (s *Service) finalizeIssue(
 		issue.CloseReason = nil
 		_ = repoClient.SetIssueLabels(ctx, project, issue.IssueIID, []string{project.LabelHumanReview})
 		note := buildMRReadyNote(issue.IssueIID, run.BranchName, project.DefaultBranch, mr)
-		_ = repoClient.CreateIssueNote(ctx, project, issue.IssueIID, note)
+		s.upsertIssueNote(ctx, repoClient, project, issue.IssueIID, issueNoteMarkerMRReady, note)
 	case db.RunKindMerge:
 		if issue.MRIID != nil {
 			if err := repoClient.MergeMergeRequest(ctx, project, *issue.MRIID); err != nil {
@@ -529,7 +505,7 @@ func (s *Service) finalizeIssue(
 					reason := db.IssueCloseReasonNeedHumanMerge
 					issue.LifecycleStatus = db.IssueLifecycleClosed
 					issue.CloseReason = &reason
-					_ = repoClient.CreateIssueNote(ctx, project, issue.IssueIID, "need human merge: "+err.Error())
+					s.upsertIssueNote(ctx, repoClient, project, issue.IssueIID, issueNoteMarkerMergeStatus, "need human merge: "+err.Error())
 					return s.db.SaveIssue(ctx, issue)
 				}
 				run.ConflictRetryCount++
@@ -784,7 +760,7 @@ func (s *Service) mapLifecycleByRemote(
 }
 
 // autoCommitAndPush 是 *Service 的方法实现。
-func (s *Service) autoCommitAndPush(ctx context.Context, issue *db.Issue, run *db.IssueRun) error {
+func (s *Service) autoCommitAndPush(ctx context.Context, issue *db.Issue, run *db.IssueRun, repoToken string) error {
 	changed, err := s.git.HasChanges(ctx, run.GitTreePath)
 	if err != nil {
 		return err
@@ -796,7 +772,7 @@ func (s *Service) autoCommitAndPush(ctx context.Context, issue *db.Issue, run *d
 	if err := s.git.CommitAll(ctx, run.GitTreePath, msg); err != nil {
 		return err
 	}
-	return s.git.PushBranch(ctx, run.GitTreePath, run.BranchName)
+	return s.git.PushBranch(ctx, run.GitTreePath, run.BranchName, repoToken)
 }
 
 // stringPtr 执行相关逻辑。
@@ -839,7 +815,7 @@ func (s *Service) markMergeFailure(
 		issue.LifecycleStatus = db.IssueLifecycleVerified
 	}
 	issue.CloseReason = nil
-	_ = repoClient.CreateIssueNote(ctx, project, issue.IssueIID, "merge failed: "+reason)
+	s.upsertIssueNote(ctx, repoClient, project, issue.IssueIID, issueNoteMarkerMergeStatus, "merge failed: "+reason)
 	return s.db.SaveIssue(ctx, issue)
 }
 
@@ -850,4 +826,54 @@ func (s *Service) issueRootDir(projectID uint, issueID uint) string {
 		strconv.Itoa(int(projectID)),
 		strconv.Itoa(int(issueID)),
 	)
+}
+
+// repoAuthToken 获取仓库拉取/推送使用的认证 token。
+func (s *Service) repoAuthToken(ctx context.Context, project db.Project) (string, error) {
+	if project.ProjectToken != nil {
+		if token := strings.TrimSpace(*project.ProjectToken); token != "" {
+			return token, nil
+		}
+	}
+
+	ref := strings.TrimSpace(project.CredentialRef)
+	if ref == "" {
+		return "", nil
+	}
+	if s.secret == nil {
+		return "", errorx.IllegalState.New("secret manager is not configured")
+	}
+	token, err := s.secret.Get(ctx, ref)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(token), nil
+}
+
+// upsertIssueNote 使用 marker 进行幂等更新，失败时降级追加评论。
+func (s *Service) upsertIssueNote(
+	ctx context.Context,
+	repoClient repocommon.Client,
+	project db.Project,
+	issueIID int64,
+	marker string,
+	body string,
+) {
+	finalBody := withIssueNoteMarker(marker, body)
+	if err := repoClient.UpsertIssueNote(ctx, project, issueIID, marker, finalBody); err != nil {
+		_ = repoClient.CreateIssueNote(ctx, project, issueIID, finalBody)
+	}
+}
+
+// withIssueNoteMarker 执行相关逻辑。
+func withIssueNoteMarker(marker string, body string) string {
+	marker = strings.TrimSpace(marker)
+	body = strings.TrimSpace(body)
+	if marker == "" || strings.Contains(body, marker) {
+		return body
+	}
+	if body == "" {
+		return marker
+	}
+	return marker + "\n" + body
 }

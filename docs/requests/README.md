@@ -13,10 +13,14 @@
   - 非功能需求（性能、稳定性、安全、可观测性）
   - 验收标准
 
+## Issue 草稿约定
+
+- Issue 草稿统一写到仓库根目录 `issue-drafts/`。
+- `issue-drafts/` 仅用于本地协作草稿，已加入 `.gitignore`，默认不入库。
+- 禁止使用 `.ai-docs/issue-drafts/` 路径。
+
 ## 当前文档
 
-- [2026-03-21-webui-router-modularization-issue-draft.md](2026-03-21-webui-router-modularization-issue-draft.md)（WebUI 拆分与 Router 引入草案）
-- [2026-03-20-plan-todo-loop-issue-draft.md](2026-03-20-plan-todo-loop-issue-draft.md)（Plan/Todo 闭环改造草案）
 - [2026-03-20-agent-autocoding-final.md](2026-03-20-agent-autocoding-final.md)（当前定稿）
 - [2026-03-20-project-requirements-v1.md](2026-03-20-project-requirements-v1.md)
 - [2026-03-20-agent-autocoding-requirements-v2.md](2026-03-20-agent-autocoding-requirements-v2.md)

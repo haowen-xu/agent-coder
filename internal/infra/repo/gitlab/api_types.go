@@ -52,3 +52,9 @@ type gitLabMR struct {
 	TargetBranch string `json:"target_branch"` // TargetBranch 字段说明。
 	State        string `json:"state"`         // State 字段说明。
 }
+
+// gitLabIssueNote 表示数据结构定义。
+type gitLabIssueNote struct {
+	ID   int64  `json:"id"`   // ID 字段说明。
+	Body string `json:"body"` // Body 字段说明。
+}

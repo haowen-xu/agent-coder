@@ -19,6 +19,10 @@ type Client interface {
 	// CreateIssueNote 在远端 issue 下追加一条评论/备注。
 	CreateIssueNote(ctx context.Context, project db.Project, issueIID int64, body string) error
 
+	// UpsertIssueNote 使用 marker 幂等更新 issue 评论。
+	// 若 marker 对应评论不存在，则创建新评论。
+	UpsertIssueNote(ctx context.Context, project db.Project, issueIID int64, marker string, body string) error
+
 	// CloseIssue 关闭远端 issue。
 	CloseIssue(ctx context.Context, project db.Project, issueIID int64) error
 

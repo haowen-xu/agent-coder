@@ -111,6 +111,39 @@ func (c *Client) CreateIssueNote(ctx context.Context, project db.Project, issueI
 	return c.doJSON(ctx, project, http.MethodPost, endpoint, payload, nil)
 }
 
+// UpsertIssueNote 是 *Client 的方法实现。
+func (c *Client) UpsertIssueNote(
+	ctx context.Context,
+	project db.Project,
+	issueIID int64,
+	marker string,
+	body string,
+) error {
+	marker = strings.TrimSpace(marker)
+	if marker == "" {
+		return c.CreateIssueNote(ctx, project, issueIID, body)
+	}
+
+	noteID, err := c.findIssueNoteByMarker(ctx, project, issueIID, marker)
+	if err != nil {
+		return err
+	}
+	if noteID <= 0 {
+		return c.CreateIssueNote(ctx, project, issueIID, body)
+	}
+
+	endpoint := c.endpoint(project, fmt.Sprintf(
+		"/projects/%s/issues/%d/notes/%d",
+		url.PathEscape(c.projectRef(project)),
+		issueIID,
+		noteID,
+	))
+	payload := map[string]any{
+		"body": body,
+	}
+	return c.doJSON(ctx, project, http.MethodPut, endpoint, payload, nil)
+}
+
 // CloseIssue 是 *Client 的方法实现。
 func (c *Client) CloseIssue(ctx context.Context, project db.Project, issueIID int64) error {
 	endpoint := c.endpoint(project, fmt.Sprintf("/projects/%s/issues/%d", url.PathEscape(c.projectRef(project)), issueIID))
@@ -222,6 +255,46 @@ func (c *Client) MergeMergeRequest(ctx context.Context, project db.Project, mrII
 func (c *Client) endpoint(project db.Project, p string) string {
 	base := strings.TrimRight(strings.TrimSpace(project.ProviderURL), "/")
 	return base + p
+}
+
+// findIssueNoteByMarker 是 *Client 的方法实现。
+func (c *Client) findIssueNoteByMarker(
+	ctx context.Context,
+	project db.Project,
+	issueIID int64,
+	marker string,
+) (int64, error) {
+	const perPage = 100
+	const maxPages = 5
+	projectRef := url.PathEscape(c.projectRef(project))
+
+	for page := 1; page <= maxPages; page++ {
+		values := url.Values{}
+		values.Set("per_page", strconv.Itoa(perPage))
+		values.Set("page", strconv.Itoa(page))
+		values.Set("order_by", "created_at")
+		values.Set("sort", "desc")
+		endpoint := c.endpoint(project, fmt.Sprintf(
+			"/projects/%s/issues/%d/notes?%s",
+			projectRef,
+			issueIID,
+			values.Encode(),
+		))
+
+		var notes []gitLabIssueNote
+		if err := c.doJSON(ctx, project, http.MethodGet, endpoint, nil, &notes); err != nil {
+			return 0, err
+		}
+		for _, note := range notes {
+			if strings.Contains(note.Body, marker) {
+				return note.ID, nil
+			}
+		}
+		if len(notes) < perPage {
+			break
+		}
+	}
+	return 0, nil
 }
 
 // projectRef 是 *Client 的方法实现。
