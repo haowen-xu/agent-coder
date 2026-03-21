@@ -1,4 +1,4 @@
-.PHONY: run tidy test webui-install webui-dev webui-build codex-plan
+.PHONY: run tidy test test-gate webui-install webui-dev webui-build codex-plan
 
 run:
 	go run ./cmds server --config config.yaml
@@ -11,6 +11,9 @@ tidy:
 
 test:
 	go test ./...
+
+test-gate:
+	./scripts/check_go_coverage_gate.sh
 
 webui-install:
 	cd webui && pnpm install

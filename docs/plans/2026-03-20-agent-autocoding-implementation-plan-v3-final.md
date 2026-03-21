@@ -90,7 +90,9 @@
 
 ## 3. 验证清单
 
-- 后端：`go test ./...`
+- 后端：
+  - `go test ./...`
+  - `./scripts/check_go_coverage_gate.sh`
 - 前端：`cd webui && pnpm build`
 - 权限：
   - admin 可管理用户/项目

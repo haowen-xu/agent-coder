@@ -32,7 +32,13 @@
 ```bash
 gofmt -w $(rg --files -g '*.go')
 go test ./...
+./scripts/check_go_coverage_gate.sh
 ```
+
+覆盖率门禁要求：
+
+- Go 代码总体覆盖率必须 `>= 80%`
+- 含有具体代码逻辑（存在可统计语句）的 Go 文件不允许 `0%` 覆盖率
 
 ## Vue / TypeScript（前端）
 

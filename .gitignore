@@ -5,6 +5,10 @@
 /bin/
 *.out
 coverage.out
+cover.out
+*.coverprofile
+coverage*.out
+lcov.info
 
 # Runtime
 *.db
