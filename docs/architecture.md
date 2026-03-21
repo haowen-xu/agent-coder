@@ -49,6 +49,7 @@
 │   │   │   ├── prompts/
 │   │   │   └── promptstore/
 │   │   ├── git/
+│   │   ├── orch/                # orchestrator（简写）
 │   │   ├── repo/
 │   │   │   ├── common/
 │   │   │   └── gitlab/
@@ -83,6 +84,7 @@
 ## Worker 执行模型
 
 - 调度来源：扫描 `issues`，为可执行 issue 创建 `issue_runs`（`dev` 或 `merge`）。
+- 运行编排：统一收敛到 `internal/infra/orch`（`orch` 为 `orchestrator` 简写）。
 - 单次 run 循环：
   - `run_kind=dev`：`dev -> review`
   - `run_kind=merge`：`merge -> review`

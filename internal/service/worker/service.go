@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -19,6 +17,7 @@ import (
 	"github.com/haowen-xu/agent-coder/internal/infra/agent/codex"
 	"github.com/haowen-xu/agent-coder/internal/infra/agent/promptstore"
 	infraGit "github.com/haowen-xu/agent-coder/internal/infra/git"
+	"github.com/haowen-xu/agent-coder/internal/infra/orch"
 	repocommon "github.com/haowen-xu/agent-coder/internal/infra/repo/common"
 	"github.com/haowen-xu/agent-coder/internal/infra/repo/gitlab"
 	"github.com/haowen-xu/agent-coder/internal/infra/secret"
@@ -34,12 +33,15 @@ type Service struct {
 	git        *infraGit.Client     // git 字段说明。
 	secret     secret.Manager       // secret 字段说明。
 	lastPolled map[uint]time.Time   // lastPolled 字段说明。
+	orchWork   *orch.WorkDir        // orchWork 字段说明。
+	orchQueue  *orch.OrchWorkerQueue
 }
 
 const (
 	issueNoteMarkerRunStatus   = "<!-- agent-coder:run-status -->"
 	issueNoteMarkerMergeStatus = "<!-- agent-coder:merge-status -->"
 	issueNoteMarkerMRReady     = "<!-- agent-coder:mr-ready -->"
+	runClaimBatchSize          = 20
 )
 
 // New 执行相关逻辑。
@@ -60,6 +62,8 @@ func New(
 		git:        infraGit.NewClient(),
 		secret:     secretManager,
 		lastPolled: make(map[uint]time.Time),
+		orchWork:   orch.NewWorkDir(cfg.Work.WorkDir),
+		orchQueue:  orch.NewOrchWorkerQueue(runClaimBatchSize, 1),
 	}
 }
 
@@ -104,7 +108,8 @@ func (s *Service) RunOnce(ctx context.Context) error {
 	if err := s.scheduleRuns(ctx); err != nil {
 		return err
 	}
-	for i := 0; i < 20; i++ {
+	runs := make([]*db.IssueRun, 0, runClaimBatchSize)
+	for i := 0; i < runClaimBatchSize; i++ {
 		run, err := s.db.ClaimNextQueuedRun(ctx)
 		if err != nil {
 			return err
@@ -112,11 +117,66 @@ func (s *Service) RunOnce(ctx context.Context) error {
 		if run == nil {
 			break
 		}
-		if err := s.executeRun(ctx, run); err != nil {
-			s.log.Error("execute run failed", slog.Uint64("run_id", uint64(run.ID)), slog.Any("error", err))
+		runs = append(runs, run)
+	}
+	if len(runs) == 0 {
+		return nil
+	}
+
+	agents := make([]orch.OrchAgent, 0, len(runs))
+	for _, run := range runs {
+		agent, err := s.newRunOrchAgent(ctx, run)
+		if err != nil {
+			return err
+		}
+		agents = append(agents, agent)
+	}
+	for i, err := range s.ensureOrchQueue().RunAndWait(ctx, agents) {
+		if err != nil {
+			s.log.Error("execute run failed",
+				slog.Uint64("run_id", uint64(runs[i].ID)),
+				slog.Any("error", err),
+			)
 		}
 	}
 	return nil
+}
+
+// newRunOrchAgent 构造 run 级 OrchAgent。
+func (s *Service) newRunOrchAgent(ctx context.Context, run *db.IssueRun) (orch.OrchAgent, error) {
+	issue, err := s.db.GetIssueByID(ctx, run.IssueID)
+	if err != nil {
+		return nil, err
+	}
+	projectKey := ""
+	var repoClient repocommon.Client
+	if issue != nil {
+		project, err := s.db.GetProjectByID(ctx, issue.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+		if project != nil {
+			projectKey = project.ProjectKey
+			repoClient, err = s.newRepoClient(*project)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	opts := orch.AgentOptions{
+		ProjectKey:  projectKey,
+		AgentClient: s.agent,
+		RepoClient:  repoClient,
+		WorkDir:     s.ensureOrchWorkDir(),
+		Runner: func(ctx context.Context, _ orch.RuntimeAgent) error {
+			return s.executeRun(ctx, run)
+		},
+	}
+	if run.RunKind == db.RunKindMerge {
+		return orch.NewOrchMergeAgent(opts), nil
+	}
+	return orch.NewOrchDevAgent(opts), nil
 }
 
 // syncProjectIssues 是 *Service 的方法实现。
@@ -237,6 +297,7 @@ func (s *Service) scheduleRuns(ctx context.Context) error {
 		}
 
 		branch := fmt.Sprintf("agent-coder/issue-%d", issue.IssueIID)
+		paths := s.ensureOrchWorkDir().BuildRunPaths(issue.ProjectID, issue.ID, runNo)
 		row := &db.IssueRun{
 			IssueID:          issue.ID,
 			RunNo:            runNo,
@@ -248,8 +309,8 @@ func (s *Service) scheduleRuns(ctx context.Context) error {
 			MaxLoopStep:      s.cfg.Agent.Codex.MaxLoopStep,
 			QueuedAt:         time.Now(),
 			BranchName:       branch,
-			GitTreePath:      filepath.Join(issue.IssueDir, "git-tree"),
-			AgentRunDir:      filepath.Join(issue.IssueDir, "agent", "runs", strconv.Itoa(runNo)),
+			GitTreePath:      paths.GitTree,
+			AgentRunDir:      paths.RunDir,
 			MaxConflictRetry: s.cfg.Agent.Codex.MaxRetry,
 		}
 		if err := s.db.CreateRun(ctx, row); err != nil {
@@ -585,8 +646,11 @@ func (s *Service) invokeRole(
 	}
 	composed := s.composePrompt(prompt, project, issue, run, role)
 	useSandbox := shouldUseSandboxForRole(project, role)
-
-	return s.agent.Run(ctx, base.InvokeRequest{
+	repoClient, err := s.newRepoClient(project)
+	if err != nil {
+		return nil, err
+	}
+	req := base.InvokeRequest{
 		RunKind:    run.RunKind,
 		Role:       role,
 		Prompt:     composed,
@@ -594,7 +658,36 @@ func (s *Service) invokeRole(
 		RunDir:     run.AgentRunDir,
 		Timeout:    time.Duration(s.cfg.Agent.Codex.TimeoutSec) * time.Second,
 		UseSandbox: useSandbox,
-	})
+	}
+	opts := orch.AgentOptions{
+		ProjectKey:    project.ProjectKey,
+		AgentClient:   s.agent,
+		RepoClient:    repoClient,
+		WorkDir:       s.ensureOrchWorkDir(),
+		InvokeRequest: req,
+	}
+
+	var roleAgent interface {
+		orch.OrchAgent
+		LastResult() *base.InvokeResult
+	}
+	switch strings.ToLower(strings.TrimSpace(role)) {
+	case "plan":
+		roleAgent = orch.NewOrchPlanAgent(opts)
+	case db.AgentRoleMerge:
+		roleAgent = orch.NewOrchMergeAgent(opts)
+	case db.AgentRoleReview:
+		roleAgent = orch.NewOrchReviewAgent(opts)
+	default:
+		roleAgent = orch.NewOrchDevAgent(opts)
+	}
+	if err := roleAgent.Run(ctx); err != nil {
+		return nil, err
+	}
+	if roleAgent.LastResult() == nil {
+		return nil, fmt.Errorf("orch agent result is empty for role=%s", role)
+	}
+	return roleAgent.LastResult(), nil
 }
 
 // loadPrompt 是 *Service 的方法实现。
@@ -821,11 +914,27 @@ func (s *Service) markMergeFailure(
 
 // issueRootDir 是 *Service 的方法实现。
 func (s *Service) issueRootDir(projectID uint, issueID uint) string {
-	return filepath.Join(
-		s.cfg.Work.WorkDir,
-		strconv.Itoa(int(projectID)),
-		strconv.Itoa(int(issueID)),
-	)
+	return s.ensureOrchWorkDir().IssueRoot(projectID, issueID)
+}
+
+func (s *Service) ensureOrchWorkDir() *orch.WorkDir {
+	if s.orchWork != nil {
+		return s.orchWork
+	}
+	root := ""
+	if s.cfg != nil {
+		root = s.cfg.Work.WorkDir
+	}
+	s.orchWork = orch.NewWorkDir(root)
+	return s.orchWork
+}
+
+func (s *Service) ensureOrchQueue() *orch.OrchWorkerQueue {
+	if s.orchQueue != nil {
+		return s.orchQueue
+	}
+	s.orchQueue = orch.NewOrchWorkerQueue(runClaimBatchSize, 1)
+	return s.orchQueue
 }
 
 // repoAuthToken 获取仓库拉取/推送使用的认证 token。
