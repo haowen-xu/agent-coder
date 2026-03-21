@@ -1,6 +1,7 @@
-# Agent 自动 Coding 需求定稿（Final）
+# 产品需求定稿
 
-> 日期：2026-03-20
+> 更新日期：2026-03-21  
+> 说明：本文件承接历史需求定稿中的有效约束，作为当前唯一需求定稿入口。
 
 ## 1. 产品定位
 
@@ -19,7 +20,7 @@
 - 平台优先级：先支持 GitLab
 - 触发方式：定时 pull issue（轮询）
 
-## 4. 代码流程策略
+## 4. 执行策略
 
 - 分支命名固定：`agent-coder/issue-<id>`
 - MR 策略：一个 issue 一个 MR（存在则复用更新）
@@ -27,70 +28,27 @@
 
 ## 5. 多项目能力
 
-支持多项目。每个项目绑定：
-
-- 一个代码仓库
-- 一个仓库协作平台项目（V1 为 GitLab project）
-- 独立 `project_key`
-- 项目级标签映射配置（可覆盖默认值）
+支持多项目。每个项目绑定一个代码仓库、一个仓库协作平台项目（V1 为 GitLab project）、独立 `project_key`，以及项目级标签映射配置。
 
 ## 6. 用户系统与权限
 
 采用最简权限模型：`users.is_admin`
 
-- `is_admin=true`
-  - 管理用户
-  - 管理项目
-  - 设置项目密钥（`project_key`）
-- `is_admin=false`
-  - 仅可查看现有项目展板（只读）
+- `is_admin=true`：管理用户、管理项目、设置项目密钥（`project_key`）
+- `is_admin=false`：仅可查看现有项目展板（只读）
 
 不引入复杂 RBAC / ACL。
 
 ## 7. 关键领域对象
 
-详细字段与索引见：`docs/database-schema.md`。
-状态机切换规则与 `issue_run` 工作目录规范也在该文档中定义。
+详细字段、索引、状态机与运行目录规范以 [database-schema.md](database-schema.md) 为准。
+
+核心对象：
 
 - `User`
-  - `username`
-  - `password_hash`
-  - `is_admin`
-  - `enabled`
 - `ProjectBinding`
-  - `provider`（如 `gitlab`）
-  - `provider_url`（`api_endpoint`，与 `repo_url` 不同）
-  - `project_key`
-  - `project_slug`
-  - `repo_url`
-  - `repo_default_branch`
-  - `issue_project_id`（可为空）
-  - `credential_ref`
-  - `poll_interval_sec`
-  - `enabled`
-  - `label_agent_ready`
-  - `label_in_progress`
-  - `label_human_review`
-  - `label_rework`
-  - `label_verified`
-  - `label_merged`
 - `WorkItem`
-  - `project_key`
-  - `issue_iid`
-  - `status`
-  - `branch_name`
-  - `mr_iid`
-  - `retry_count`
-  - `last_error`
 - `IssueRun`
-  - `run_no`
-  - `run_kind`（`dev/merge`）
-  - `status`
-  - `agent_role`
-  - `loop_step`
-  - `max_loop_step`
-  - `git_tree_path`
-  - `agent_run_dir`
 
 ## 8. 工程实现约束
 
@@ -110,13 +68,14 @@
 - Go 单元测试覆盖率门禁：
   - 总体覆盖率 `>= 80%`
   - 含具体代码逻辑的 Go 文件不允许 `0%` 覆盖率
+  - 单元测试文件必须与被测文件同名配对：`xxx.go` 对应 `xxx_test.go`
 
-## 9.1 项目标识兼容约束
+## 9.1 项目标识约束
 
-- `issue_project_id` 允许为 `NULL`（兼容不提供项目 ID 的平台场景）。
-- 新增 `project_slug`（`VARCHAR`），用于保存平台侧稳定可读标识（如 `group/repo`、`owner/repo`）。
-- `provider_url` 必填，表示仓库协作平台 API endpoint（例如 `https://gitlab.example.com/api/v4`）。
-- `repo_url` 仅表示代码仓库地址（例如 `git@...` 或 `https://...git`），两者不能混用。
+- `issue_project_id` 允许为 `NULL`（兼容不提供项目 ID 的平台场景）
+- `project_slug` 用于保存平台侧稳定可读标识（如 `group/repo`、`owner/repo`）
+- `provider_url` 必填，表示仓库协作平台 API endpoint（例如 `https://gitlab.example.com/api/v4`）
+- `repo_url` 仅表示代码仓库地址（例如 `git@...` 或 `https://...git`），与 `provider_url` 不能混用
 
 ## 10. Issue 标签工作流（默认值）
 
@@ -131,15 +90,13 @@
 
 补充（本地生命周期语义）：
 
-- 本地 `issues.lifecycle_status` 不再使用 `merged`，统一收敛为 `closed`。
+- 本地 `issues.lifecycle_status` 不再使用 `merged`，统一收敛为 `closed`
 - 通过 `issues.close_reason` 区分关闭原因：
   - `merged`：自动合并完成
   - `manual`：远端人工关闭
   - `need_human_merge`：仓库协作平台不允许自动合并，转人工合并
 
 ## 11. Agent 介入硬门禁
-
-普通 issue 即使带有 `In Progress` / `Human Review` 等标签，也不允许 Agent 直接介入，且不会写入本地 `issues` 表。
 
 Agent 仅在满足以下条件时才允许进入本地系统：
 
@@ -153,7 +110,7 @@ Agent 仅在满足以下条件时才允许进入本地系统：
 
 ## 12. 单次 IssueRun 执行循环
 
-单次 run 采用固定 loop，不引入 `issue_sub_runs`：
+单次 run 采用固定 loop，不引入 `issue_sub_runs`。
 
 角色与类型约束：
 
@@ -182,11 +139,7 @@ Agent 仅在满足以下条件时才允许进入本地系统：
 
 ## 13. Prompt 管理（默认 + 项目覆盖）
 
-- 默认 Prompt 以 markdown 文件形式放在 Go 项目中，通过 `go:embed` 内嵌。
-- 项目可在数据库配置 Prompt 覆盖（优先级高于默认模板）。
-- 覆盖维度：`project_key + run_kind + agent_role`。
-- 需要提供 Admin 接口：
-  - 查询默认模板
-  - 查询项目有效模板
-  - 写入/更新项目覆盖模板
-  - 删除项目覆盖模板（回退默认模板）
+- 默认 Prompt 以 markdown 文件形式放在 Go 项目中，通过 `go:embed` 内嵌
+- 项目可在数据库配置 Prompt 覆盖（优先级高于默认模板）
+- 覆盖维度：`project_key + run_kind + agent_role`
+- 需提供 Admin 接口：查询默认模板、查询项目有效模板、写入/更新项目覆盖模板、删除项目覆盖模板（回退默认模板）

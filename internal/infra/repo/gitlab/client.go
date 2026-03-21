@@ -257,6 +257,90 @@ func (c *Client) endpoint(project db.Project, p string) string {
 	return base + p
 }
 
+// ValidateURL 是 *Client 的方法实现。
+func (c *Client) ValidateURL(ctx context.Context, args repocommon.ValidateURLArgs) (*repocommon.ValidateURLResult, error) {
+	providerURL := strings.TrimSpace(args.ProviderURL)
+	repoURL := strings.TrimSpace(args.RepoURL)
+	projectToken := strings.TrimSpace(args.ProjectToken)
+	if providerURL == "" {
+		return nil, xerr.Infra.New("provider_url is required")
+	}
+	if repoURL == "" {
+		return nil, xerr.Infra.New("repo_url is required")
+	}
+	if projectToken == "" {
+		return nil, xerr.Infra.New("project_token is required")
+	}
+
+	projectSlug, err := parseGitLabProjectSlug(repoURL)
+	if err != nil {
+		return nil, err
+	}
+
+	project := db.Project{
+		ProviderURL: providerURL,
+		ProjectToken: func(v string) *string {
+			return &v
+		}(projectToken),
+	}
+
+	var row struct {
+		ID                gitLabID `json:"id"`
+		PathWithNamespace string   `json:"path_with_namespace"`
+	}
+	endpoint := c.endpoint(project, fmt.Sprintf("/projects/%s", url.PathEscape(projectSlug)))
+	if err := c.doJSON(ctx, project, http.MethodGet, endpoint, nil, &row); err != nil {
+		return nil, xerr.Infra.Wrap(err, "validate gitlab repo url")
+	}
+
+	projectID := strings.TrimSpace(string(row.ID))
+	if projectID == "" {
+		return nil, xerr.Infra.New("gitlab project id is empty for repo_url=%s", repoURL)
+	}
+	resolvedSlug := strings.TrimSpace(row.PathWithNamespace)
+	if resolvedSlug == "" {
+		resolvedSlug = projectSlug
+	}
+
+	return &repocommon.ValidateURLResult{
+		ProjectID:   projectID,
+		ProjectSlug: resolvedSlug,
+	}, nil
+}
+
+// parseGitLabProjectSlug 执行相关逻辑。
+func parseGitLabProjectSlug(repoURL string) (string, error) {
+	raw := strings.TrimSpace(repoURL)
+	if raw == "" {
+		return "", xerr.Infra.New("repo_url is required")
+	}
+
+	slug := ""
+	if strings.Contains(raw, "://") {
+		u, err := url.Parse(raw)
+		if err != nil {
+			return "", xerr.Infra.Wrap(err, "parse repo_url")
+		}
+		slug = strings.TrimSpace(strings.Trim(u.Path, "/"))
+	} else if at := strings.Index(raw, "@"); at >= 0 && strings.Contains(raw, ":") {
+		parts := strings.SplitN(raw, ":", 2)
+		if len(parts) == 2 {
+			slug = strings.TrimSpace(parts[1])
+		}
+	}
+	if slug == "" {
+		slug = raw
+	}
+
+	slug = strings.TrimPrefix(slug, "/")
+	slug = strings.TrimSuffix(slug, ".git")
+	slug = strings.TrimSpace(slug)
+	if slug == "" {
+		return "", xerr.Infra.New("failed to parse project slug from repo_url=%s", repoURL)
+	}
+	return slug, nil
+}
+
 // findIssueNoteByMarker 是 *Client 的方法实现。
 func (c *Client) findIssueNoteByMarker(
 	ctx context.Context,

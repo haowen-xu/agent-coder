@@ -39,6 +39,7 @@ go test ./...
 
 - Go 代码总体覆盖率必须 `>= 80%`
 - 含有具体代码逻辑（存在可统计语句）的 Go 文件不允许 `0%` 覆盖率
+- Go 单元测试文件必须按同名规则放置：`xxx.go` 的单元测试必须写在 `xxx_test.go`（例如 `client.go` -> `client_test.go`）
 
 ## Vue / TypeScript（前端）
 

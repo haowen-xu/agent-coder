@@ -3,6 +3,8 @@ package core
 import (
 	"context"
 	"fmt"
+	"io"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -11,6 +13,8 @@ import (
 	"github.com/haowen-xu/agent-coder/internal/dal"
 	"github.com/haowen-xu/agent-coder/internal/infra/agent/prompts"
 	"github.com/haowen-xu/agent-coder/internal/infra/agent/promptstore"
+	repocommon "github.com/haowen-xu/agent-coder/internal/infra/repo/common"
+	"github.com/haowen-xu/agent-coder/internal/infra/repo/gitlab"
 	"github.com/haowen-xu/agent-coder/internal/xerr"
 )
 
@@ -273,6 +277,9 @@ func (s *Service) CreateProject(ctx context.Context, createdBy uint, in ProjectU
 	if existed != nil {
 		return nil, xerr.Config.New("project_key already exists")
 	}
+	if err := s.fillIssueProjectIDOnCreate(ctx, &in); err != nil {
+		return nil, err
+	}
 	row := &db.Project{
 		ProjectKey:        in.ProjectKey,
 		ProjectSlug:       in.ProjectSlug,
@@ -299,6 +306,51 @@ func (s *Service) CreateProject(ctx context.Context, createdBy uint, in ProjectU
 		return nil, err
 	}
 	return row, nil
+}
+
+// fillIssueProjectIDOnCreate 在创建项目时补全远端 project_id，无法补全时快速失败。
+func (s *Service) fillIssueProjectIDOnCreate(ctx context.Context, in *ProjectUpsertInput) error {
+	if in == nil {
+		return xerr.Config.New("project input is required")
+	}
+	provider := strings.ToLower(strings.TrimSpace(in.Provider))
+	switch provider {
+	case "", db.ProviderGitLab:
+	default:
+		return xerr.Config.New("unsupported provider: %s", in.Provider)
+	}
+
+	if in.ProjectToken == nil || strings.TrimSpace(*in.ProjectToken) == "" {
+		return xerr.Config.New("project_token is required to validate repo_url and auto-fill issue_project_id")
+	}
+	token := strings.TrimSpace(*in.ProjectToken)
+
+	timeout := 30 * time.Second
+	if s != nil && s.cfg != nil {
+		timeout = time.Duration(s.cfg.RepoHTTPTimeoutSec()) * time.Second
+	}
+	validator := gitlab.NewClient(slog.New(slog.NewTextHandler(io.Discard, nil)), timeout, nil)
+	resolved, err := validator.ValidateURL(ctx, repocommon.ValidateURLArgs{
+		ProviderURL:  in.ProviderURL,
+		RepoURL:      in.RepoURL,
+		ProjectToken: token,
+	})
+	if err != nil {
+		return xerr.Config.Wrap(err, "validate repo_url")
+	}
+	if resolved == nil || strings.TrimSpace(resolved.ProjectID) == "" {
+		return xerr.Config.New("failed to resolve issue_project_id from repo_url")
+	}
+
+	remoteID := strings.TrimSpace(resolved.ProjectID)
+	if in.IssueProjectID != nil && strings.TrimSpace(*in.IssueProjectID) != "" {
+		inputID := strings.TrimSpace(*in.IssueProjectID)
+		if inputID != remoteID {
+			return xerr.Config.New("issue_project_id mismatch with remote project_id: input=%s remote=%s", inputID, remoteID)
+		}
+	}
+	in.IssueProjectID = &remoteID
+	return nil
 }
 
 // UpdateProject 是 *Service 的方法实现。

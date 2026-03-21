@@ -34,3 +34,10 @@ type Client interface {
 	// 若平台不允许自动合并，应返回 ErrNeedHumanMerge。
 	MergeMergeRequest(ctx context.Context, project db.Project, mrIID int64) error
 }
+
+// URLValidator 定义 repo URL 校验与项目元信息补全接口。
+type URLValidator interface {
+	// ValidateURL 校验 repo URL 可达性并返回平台项目标识信息。
+	// 校验失败应尽快返回错误，供上层快速失败。
+	ValidateURL(ctx context.Context, args ValidateURLArgs) (*ValidateURLResult, error)
+}

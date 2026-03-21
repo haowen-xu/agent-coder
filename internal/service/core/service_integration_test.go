@@ -4,6 +4,8 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -146,6 +148,19 @@ func TestServiceProjectPromptAndOpsFlow(t *testing.T) {
 	ctx := context.Background()
 	svc, dbClient := newCoreServiceForTest(t)
 
+	gitlabServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.EscapedPath() == "/api/v4/projects/group%2Fp1" {
+			if r.Header.Get("PRIVATE-TOKEN") != "token-x" {
+				t.Fatalf("missing PRIVATE-TOKEN header")
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"id":123,"path_with_namespace":"group/p1"}`))
+			return
+		}
+		t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+	}))
+	defer gitlabServer.Close()
+
 	invalid := ProjectUpsertInput{}
 	NormalizeProjectInput(&invalid)
 	if err := ValidateProjectInput(invalid); err == nil {
@@ -160,7 +175,7 @@ func TestServiceProjectPromptAndOpsFlow(t *testing.T) {
 		ProjectKey:      "p1",
 		ProjectSlug:     "group/p1",
 		Name:            "Project One",
-		ProviderURL:     "https://gitlab.example.com/api/v4",
+		ProviderURL:     gitlabServer.URL + "/api/v4",
 		RepoURL:         "https://gitlab.example.com/group/p1",
 		ProjectToken:    ptrString("  token-x "),
 		Enabled:         true,
@@ -173,15 +188,31 @@ func TestServiceProjectPromptAndOpsFlow(t *testing.T) {
 	if project.DefaultBranch != "main" || project.Provider != db.ProviderGitLab || project.ProjectToken == nil || *project.ProjectToken != "token-x" {
 		t.Fatalf("project normalization mismatch: %#v", project)
 	}
+	if project.IssueProjectID == nil || *project.IssueProjectID != "123" {
+		t.Fatalf("issue_project_id should be auto-filled: %#v", project)
+	}
 	if _, err := svc.CreateProject(ctx, 1, in); err == nil {
 		t.Fatalf("expected duplicate project create error")
+	}
+
+	if _, err := svc.CreateProject(ctx, 1, ProjectUpsertInput{
+		ProjectKey:      "p-no-token",
+		ProjectSlug:     "group/p-no-token",
+		Name:            "Project No Token",
+		ProviderURL:     gitlabServer.URL + "/api/v4",
+		RepoURL:         "https://gitlab.example.com/group/p-no-token",
+		CredentialRef:   "secret-ref",
+		Enabled:         true,
+		PollIntervalSec: 30,
+	}); err == nil || !strings.Contains(err.Error(), "project_token is required") {
+		t.Fatalf("expected fast-fail when project_token missing, err=%v", err)
 	}
 
 	updated, err := svc.UpdateProject(ctx, "p1", ProjectUpsertInput{
 		ProjectSlug:   "group/p1",
 		ProjectKey:    "p1",
 		Name:          "Project One Updated",
-		ProviderURL:   "https://gitlab.example.com/api/v4",
+		ProviderURL:   gitlabServer.URL + "/api/v4",
 		RepoURL:       "https://gitlab.example.com/group/p1",
 		CredentialRef: "secret-ref",
 		Enabled:       true,

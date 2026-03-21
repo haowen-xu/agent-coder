@@ -177,6 +177,75 @@ func TestClientEnsureMergeRequest(t *testing.T) {
 	})
 }
 
+// TestClientValidateURL 用于单元测试。
+func TestClientValidateURL(t *testing.T) {
+	t.Parallel()
+
+	t.Run("success_https_repo_url", func(t *testing.T) {
+		var gotToken string
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodGet || r.URL.EscapedPath() != "/projects/group%2Frepo" {
+				t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+			}
+			gotToken = r.Header.Get("PRIVATE-TOKEN")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"id":42,"path_with_namespace":"group/repo"}`))
+		}))
+		defer server.Close()
+
+		client := NewClient(slog.New(slog.NewTextHandler(io.Discard, nil)), 5*time.Second, nil)
+		row, err := client.ValidateURL(context.Background(), repocommon.ValidateURLArgs{
+			ProviderURL:  server.URL,
+			RepoURL:      "https://gitlab.example.com/group/repo.git",
+			ProjectToken: "token-x",
+		})
+		if err != nil {
+			t.Fatalf("ValidateURL failed: %v", err)
+		}
+		if row == nil || row.ProjectID != "42" || row.ProjectSlug != "group/repo" {
+			t.Fatalf("ValidateURL result mismatch: %#v", row)
+		}
+		if gotToken != "token-x" {
+			t.Fatalf("expected PRIVATE-TOKEN header token-x, got %q", gotToken)
+		}
+	})
+
+	t.Run("success_ssh_repo_url", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodGet || r.URL.EscapedPath() != "/projects/group%2Frepo" {
+				t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"id":"99","path_with_namespace":"group/repo"}`))
+		}))
+		defer server.Close()
+
+		client := NewClient(slog.New(slog.NewTextHandler(io.Discard, nil)), 5*time.Second, nil)
+		row, err := client.ValidateURL(context.Background(), repocommon.ValidateURLArgs{
+			ProviderURL:  server.URL,
+			RepoURL:      "git@gitlab.example.com:group/repo.git",
+			ProjectToken: "token-x",
+		})
+		if err != nil {
+			t.Fatalf("ValidateURL failed: %v", err)
+		}
+		if row == nil || row.ProjectID != "99" {
+			t.Fatalf("ValidateURL result mismatch: %#v", row)
+		}
+	})
+
+	t.Run("missing_token", func(t *testing.T) {
+		client := NewClient(slog.New(slog.NewTextHandler(io.Discard, nil)), 5*time.Second, nil)
+		_, err := client.ValidateURL(context.Background(), repocommon.ValidateURLArgs{
+			ProviderURL: "https://gitlab.example.com/api/v4",
+			RepoURL:     "https://gitlab.example.com/group/repo.git",
+		})
+		if err == nil {
+			t.Fatalf("expected error for missing project_token")
+		}
+	})
+}
+
 // TestClientMergeMergeRequest covers success, need-human and generic non-2xx branches.
 func TestClientMergeMergeRequest(t *testing.T) {
 	t.Parallel()

@@ -11,8 +11,8 @@
 - 配置与运行时规范: [docs/config-runtime.md](docs/config-runtime.md)
 - 自动化执行流: [docs/automation-codex-plan.md](docs/automation-codex-plan.md)
 - 代码规范: [docs/code-style/README.md](docs/code-style/README.md)
+- 产品需求定稿: [docs/requirements.md](docs/requirements.md)
 - 计划文件规范: [docs/plans/README.md](docs/plans/README.md)
-- 需求讨论: [docs/requests/README.md](docs/requests/README.md)
 
 ## 当前约束
 

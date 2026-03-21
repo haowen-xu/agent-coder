@@ -40,3 +40,16 @@ type CreateOrUpdateMRRequest struct {
 	Title        string // Title 是 MR 标题。
 	Description  string // Description 是 MR 描述。
 }
+
+// ValidateURLArgs 定义 repo URL 校验输入参数。
+type ValidateURLArgs struct {
+	ProviderURL  string // ProviderURL 是仓库协作平台 API endpoint。
+	RepoURL      string // RepoURL 是代码仓库地址。
+	ProjectToken string // ProjectToken 是用于访问平台 API 的 token。
+}
+
+// ValidateURLResult 定义 repo URL 校验结果。
+type ValidateURLResult struct {
+	ProjectID   string // ProjectID 是平台项目 ID（例如 GitLab 的 project id）。
+	ProjectSlug string // ProjectSlug 是平台项目路径（例如 group/repo）。
+}
