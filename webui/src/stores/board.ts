@@ -1,36 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { apiRequest } from '../api'
+import { listBoardIssuesApi, listBoardProjectsApi } from '../api/board'
+import type { IssueRow, ProjectRow } from '../types/board'
 
-export interface ProjectRow {
-  id: number
-  project_key: string
-  project_slug: string
-  name: string
-  provider: string
-  enabled: boolean
-}
-
-export interface IssueRow {
-  id: number
-  issue_iid: number
-  title: string
-  state: string
-  lifecycle_status: string
-  branch_name?: string
-  mr_iid?: number
-  mr_url?: string
-  updated_at: string
-}
-
-interface ProjectsResp {
-  items: ProjectRow[]
-}
-
-interface IssuesResp {
-  project_key: string
-  items: IssueRow[]
-}
+export type { IssueRow, ProjectRow } from '../types/board'
 
 export const useBoardStore = defineStore('board', () => {
   const loading = ref(false)
@@ -43,7 +16,7 @@ export const useBoardStore = defineStore('board', () => {
     loading.value = true
     error.value = ''
     try {
-      const resp = await apiRequest<ProjectsResp>('/api/v1/board/projects', { token })
+      const resp = await listBoardProjectsApi(token)
       projects.value = resp.items
       if (!selectedProjectKey.value && resp.items.length > 0) {
         selectedProjectKey.value = resp.items[0].project_key
@@ -65,9 +38,7 @@ export const useBoardStore = defineStore('board', () => {
     error.value = ''
     try {
       selectedProjectKey.value = projectKey
-      const resp = await apiRequest<IssuesResp>(`/api/v1/board/projects/${encodeURIComponent(projectKey)}/issues`, {
-        token,
-      })
+      const resp = await listBoardIssuesApi(token, projectKey)
       issues.value = resp.items
     } catch (err) {
       error.value = (err as Error).message

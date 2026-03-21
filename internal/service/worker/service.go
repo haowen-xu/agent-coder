@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -44,7 +45,7 @@ func New(
 	ps *promptstore.Service,
 	secretManager secret.Manager,
 ) *Service {
-	agentClient := codex.NewClient(cfg.Agent.Codex.Binary)
+	agentClient := codex.NewClient(cfg.Agent.Codex.Binary, cfg.Agent.Codex.Sandbox)
 	return &Service{
 		cfg:        cfg,
 		log:        log,
@@ -301,7 +302,7 @@ func (s *Service) executeRun(ctx context.Context, run *db.IssueRun) error {
 		now := time.Now()
 		run.StartedAt = &now
 	}
-	repoPath, err := s.git.EnsureProjectRepo(ctx, s.cfg.Work.WorkDir, project.RepoURL, project.ProjectKey)
+	repoPath, err := s.git.EnsureProjectRepo(ctx, s.cfg.Work.WorkDir, authRepoURL(*project), project.ProjectKey)
 	if err != nil {
 		return err
 	}
@@ -415,6 +416,39 @@ func (s *Service) executeRun(ctx context.Context, run *db.IssueRun) error {
 	}
 
 	return s.finalizeIssue(ctx, repoClient, *project, issue, run, failed, lastErr)
+}
+
+// authRepoURL 根据项目 token 构造可用于 git clone/fetch/push 的仓库地址。
+func authRepoURL(project db.Project) string {
+	repoURL := strings.TrimSpace(project.RepoURL)
+	if repoURL == "" || project.ProjectToken == nil {
+		return repoURL
+	}
+
+	token := strings.TrimSpace(*project.ProjectToken)
+	if token == "" {
+		return repoURL
+	}
+
+	parsed, err := url.Parse(repoURL)
+	if err != nil {
+		return repoURL
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return repoURL
+	}
+	if parsed.Host == "" {
+		return repoURL
+	}
+
+	username := "oauth2"
+	if parsed.User != nil {
+		if existing := strings.TrimSpace(parsed.User.Username()); existing != "" {
+			username = existing
+		}
+	}
+	parsed.User = url.UserPassword(username, token)
+	return parsed.String()
 }
 
 // newRepoClient 是 *Service 的方法实现。
@@ -574,14 +608,16 @@ func (s *Service) invokeRole(
 		return nil, err
 	}
 	composed := s.composePrompt(prompt, project, issue, run, role)
+	useSandbox := shouldUseSandboxForRole(project, role)
 
 	return s.agent.Run(ctx, base.InvokeRequest{
-		RunKind: run.RunKind,
-		Role:    role,
-		Prompt:  composed,
-		WorkDir: run.GitTreePath,
-		RunDir:  run.AgentRunDir,
-		Timeout: time.Duration(s.cfg.Agent.Codex.TimeoutSec) * time.Second,
+		RunKind:    run.RunKind,
+		Role:       role,
+		Prompt:     composed,
+		WorkDir:    run.GitTreePath,
+		RunDir:     run.AgentRunDir,
+		Timeout:    time.Duration(s.cfg.Agent.Codex.TimeoutSec) * time.Second,
+		UseSandbox: useSandbox,
 	})
 }
 
@@ -669,6 +705,18 @@ func initialRole(runKind string) string {
 		return db.AgentRoleMerge
 	}
 	return db.AgentRoleDev
+}
+
+// shouldUseSandboxForRole 执行相关逻辑。
+func shouldUseSandboxForRole(project db.Project, role string) bool {
+	switch strings.ToLower(strings.TrimSpace(role)) {
+	case db.AgentRoleDev, db.AgentRoleMerge:
+		return false
+	case db.AgentRoleReview, "plan":
+		return project.SandboxPlanReview
+	default:
+		return false
+	}
 }
 
 // containsLabel 执行相关逻辑。

@@ -46,6 +46,8 @@ func New(cfg *appcfg.Config, log *slog.Logger, dbClient *db.Client, svc *core.Se
 
 // registerRoutes 是 *Server 的方法实现。
 func (s *Server) registerRoutes() {
+	s.hz.Use(s.servePrecompressedStaticGzip())
+
 	s.hz.GET("/healthz", s.healthz)
 	s.hz.GET("/api/v1/meta", s.meta)
 	s.hz.POST("/api/v1/auth/login", s.login)

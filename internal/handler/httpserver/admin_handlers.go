@@ -106,51 +106,53 @@ func (s *Server) adminUpdateUser(ctx context.Context, c *app.RequestContext) {
 
 // adminProjectRequest 表示数据结构定义。
 type adminProjectRequest struct {
-	ProjectKey       string  `json:"project_key"`        // ProjectKey 字段说明。
-	ProjectSlug      string  `json:"project_slug"`       // ProjectSlug 字段说明。
-	Name             string  `json:"name"`               // Name 字段说明。
-	Provider         string  `json:"provider"`           // Provider 字段说明。
-	ProviderURL      string  `json:"provider_url"`       // ProviderURL 字段说明。
-	RepoURL          string  `json:"repo_url"`           // RepoURL 字段说明。
-	DefaultBranch    string  `json:"default_branch"`     // DefaultBranch 字段说明。
-	IssueProjectID   *string `json:"issue_project_id"`   // IssueProjectID 字段说明。
-	CredentialRef    string  `json:"credential_ref"`     // CredentialRef 字段说明。
-	ProjectToken     *string `json:"project_token"`      // ProjectToken 字段说明。
-	PollIntervalSec  int     `json:"poll_interval_sec"`  // PollIntervalSec 字段说明。
-	Enabled          *bool   `json:"enabled"`            // Enabled 字段说明。
-	LabelAgentReady  string  `json:"label_agent_ready"`  // LabelAgentReady 字段说明。
-	LabelInProgress  string  `json:"label_in_progress"`  // LabelInProgress 字段说明。
-	LabelHumanReview string  `json:"label_human_review"` // LabelHumanReview 字段说明。
-	LabelRework      string  `json:"label_rework"`       // LabelRework 字段说明。
-	LabelVerified    string  `json:"label_verified"`     // LabelVerified 字段说明。
-	LabelMerged      string  `json:"label_merged"`       // LabelMerged 字段说明。
+	ProjectKey        string  `json:"project_key"`         // ProjectKey 字段说明。
+	ProjectSlug       string  `json:"project_slug"`        // ProjectSlug 字段说明。
+	Name              string  `json:"name"`                // Name 字段说明。
+	Provider          string  `json:"provider"`            // Provider 字段说明。
+	ProviderURL       string  `json:"provider_url"`        // ProviderURL 字段说明。
+	RepoURL           string  `json:"repo_url"`            // RepoURL 字段说明。
+	DefaultBranch     string  `json:"default_branch"`      // DefaultBranch 字段说明。
+	IssueProjectID    *string `json:"issue_project_id"`    // IssueProjectID 字段说明。
+	CredentialRef     string  `json:"credential_ref"`      // CredentialRef 字段说明。
+	ProjectToken      *string `json:"project_token"`       // ProjectToken 字段说明。
+	SandboxPlanReview bool    `json:"sandbox_plan_review"` // SandboxPlanReview 字段说明。
+	PollIntervalSec   int     `json:"poll_interval_sec"`   // PollIntervalSec 字段说明。
+	Enabled           *bool   `json:"enabled"`             // Enabled 字段说明。
+	LabelAgentReady   string  `json:"label_agent_ready"`   // LabelAgentReady 字段说明。
+	LabelInProgress   string  `json:"label_in_progress"`   // LabelInProgress 字段说明。
+	LabelHumanReview  string  `json:"label_human_review"`  // LabelHumanReview 字段说明。
+	LabelRework       string  `json:"label_rework"`        // LabelRework 字段说明。
+	LabelVerified     string  `json:"label_verified"`      // LabelVerified 字段说明。
+	LabelMerged       string  `json:"label_merged"`        // LabelMerged 字段说明。
 }
 
 // adminProjectItem 表示数据结构定义。
 type adminProjectItem struct {
-	ID               uint       `json:"id"`                           // ID 字段说明。
-	ProjectKey       string     `json:"project_key"`                  // ProjectKey 字段说明。
-	ProjectSlug      string     `json:"project_slug"`                 // ProjectSlug 字段说明。
-	Name             string     `json:"name"`                         // Name 字段说明。
-	Provider         string     `json:"provider"`                     // Provider 字段说明。
-	ProviderURL      string     `json:"provider_url"`                 // ProviderURL 字段说明。
-	RepoURL          string     `json:"repo_url"`                     // RepoURL 字段说明。
-	DefaultBranch    string     `json:"default_branch"`               // DefaultBranch 字段说明。
-	IssueProjectID   *string    `json:"issue_project_id,omitempty"`   // IssueProjectID 字段说明。
-	CredentialRef    string     `json:"credential_ref"`               // CredentialRef 字段说明。
-	ProjectToken     *string    `json:"project_token,omitempty"`      // ProjectToken 字段说明。
-	PollIntervalSec  int        `json:"poll_interval_sec"`            // PollIntervalSec 字段说明。
-	Enabled          bool       `json:"enabled"`                      // Enabled 字段说明。
-	LastIssueSyncAt  *time.Time `json:"last_issue_sync_at,omitempty"` // LastIssueSyncAt 字段说明。
-	LabelAgentReady  string     `json:"label_agent_ready"`            // LabelAgentReady 字段说明。
-	LabelInProgress  string     `json:"label_in_progress"`            // LabelInProgress 字段说明。
-	LabelHumanReview string     `json:"label_human_review"`           // LabelHumanReview 字段说明。
-	LabelRework      string     `json:"label_rework"`                 // LabelRework 字段说明。
-	LabelVerified    string     `json:"label_verified"`               // LabelVerified 字段说明。
-	LabelMerged      string     `json:"label_merged"`                 // LabelMerged 字段说明。
-	CreatedBy        uint       `json:"created_by"`                   // CreatedBy 字段说明。
-	CreatedAt        time.Time  `json:"created_at"`                   // CreatedAt 字段说明。
-	UpdatedAt        time.Time  `json:"updated_at"`                   // UpdatedAt 字段说明。
+	ID                uint       `json:"id"`                           // ID 字段说明。
+	ProjectKey        string     `json:"project_key"`                  // ProjectKey 字段说明。
+	ProjectSlug       string     `json:"project_slug"`                 // ProjectSlug 字段说明。
+	Name              string     `json:"name"`                         // Name 字段说明。
+	Provider          string     `json:"provider"`                     // Provider 字段说明。
+	ProviderURL       string     `json:"provider_url"`                 // ProviderURL 字段说明。
+	RepoURL           string     `json:"repo_url"`                     // RepoURL 字段说明。
+	DefaultBranch     string     `json:"default_branch"`               // DefaultBranch 字段说明。
+	IssueProjectID    *string    `json:"issue_project_id,omitempty"`   // IssueProjectID 字段说明。
+	CredentialRef     string     `json:"credential_ref"`               // CredentialRef 字段说明。
+	ProjectToken      *string    `json:"project_token,omitempty"`      // ProjectToken 字段说明。
+	SandboxPlanReview bool       `json:"sandbox_plan_review"`          // SandboxPlanReview 字段说明。
+	PollIntervalSec   int        `json:"poll_interval_sec"`            // PollIntervalSec 字段说明。
+	Enabled           bool       `json:"enabled"`                      // Enabled 字段说明。
+	LastIssueSyncAt   *time.Time `json:"last_issue_sync_at,omitempty"` // LastIssueSyncAt 字段说明。
+	LabelAgentReady   string     `json:"label_agent_ready"`            // LabelAgentReady 字段说明。
+	LabelInProgress   string     `json:"label_in_progress"`            // LabelInProgress 字段说明。
+	LabelHumanReview  string     `json:"label_human_review"`           // LabelHumanReview 字段说明。
+	LabelRework       string     `json:"label_rework"`                 // LabelRework 字段说明。
+	LabelVerified     string     `json:"label_verified"`               // LabelVerified 字段说明。
+	LabelMerged       string     `json:"label_merged"`                 // LabelMerged 字段说明。
+	CreatedBy         uint       `json:"created_by"`                   // CreatedBy 字段说明。
+	CreatedAt         time.Time  `json:"created_at"`                   // CreatedAt 字段说明。
+	UpdatedAt         time.Time  `json:"updated_at"`                   // UpdatedAt 字段说明。
 }
 
 // adminListProjects 是 *Server 的方法实现。
@@ -176,23 +178,24 @@ func (s *Server) adminCreateProject(ctx context.Context, c *app.RequestContext) 
 	}
 	user := currentUser(c)
 	in := coresvc.ProjectUpsertInput{
-		ProjectKey:       req.ProjectKey,
-		ProjectSlug:      req.ProjectSlug,
-		Name:             req.Name,
-		Provider:         req.Provider,
-		ProviderURL:      req.ProviderURL,
-		RepoURL:          req.RepoURL,
-		DefaultBranch:    req.DefaultBranch,
-		IssueProjectID:   req.IssueProjectID,
-		CredentialRef:    req.CredentialRef,
-		ProjectToken:     req.ProjectToken,
-		PollIntervalSec:  req.PollIntervalSec,
-		LabelAgentReady:  req.LabelAgentReady,
-		LabelInProgress:  req.LabelInProgress,
-		LabelHumanReview: req.LabelHumanReview,
-		LabelRework:      req.LabelRework,
-		LabelVerified:    req.LabelVerified,
-		LabelMerged:      req.LabelMerged,
+		ProjectKey:        req.ProjectKey,
+		ProjectSlug:       req.ProjectSlug,
+		Name:              req.Name,
+		Provider:          req.Provider,
+		ProviderURL:       req.ProviderURL,
+		RepoURL:           req.RepoURL,
+		DefaultBranch:     req.DefaultBranch,
+		IssueProjectID:    req.IssueProjectID,
+		CredentialRef:     req.CredentialRef,
+		ProjectToken:      req.ProjectToken,
+		SandboxPlanReview: req.SandboxPlanReview,
+		PollIntervalSec:   req.PollIntervalSec,
+		LabelAgentReady:   req.LabelAgentReady,
+		LabelInProgress:   req.LabelInProgress,
+		LabelHumanReview:  req.LabelHumanReview,
+		LabelRework:       req.LabelRework,
+		LabelVerified:     req.LabelVerified,
+		LabelMerged:       req.LabelMerged,
 	}
 	if req.Enabled != nil {
 		in.Enabled = *req.Enabled
@@ -222,23 +225,24 @@ func (s *Server) adminUpdateProject(ctx context.Context, c *app.RequestContext) 
 		return
 	}
 	in := coresvc.ProjectUpsertInput{
-		ProjectKey:       req.ProjectKey,
-		ProjectSlug:      req.ProjectSlug,
-		Name:             req.Name,
-		Provider:         req.Provider,
-		ProviderURL:      req.ProviderURL,
-		RepoURL:          req.RepoURL,
-		DefaultBranch:    req.DefaultBranch,
-		IssueProjectID:   req.IssueProjectID,
-		CredentialRef:    req.CredentialRef,
-		ProjectToken:     req.ProjectToken,
-		PollIntervalSec:  req.PollIntervalSec,
-		LabelAgentReady:  req.LabelAgentReady,
-		LabelInProgress:  req.LabelInProgress,
-		LabelHumanReview: req.LabelHumanReview,
-		LabelRework:      req.LabelRework,
-		LabelVerified:    req.LabelVerified,
-		LabelMerged:      req.LabelMerged,
+		ProjectKey:        req.ProjectKey,
+		ProjectSlug:       req.ProjectSlug,
+		Name:              req.Name,
+		Provider:          req.Provider,
+		ProviderURL:       req.ProviderURL,
+		RepoURL:           req.RepoURL,
+		DefaultBranch:     req.DefaultBranch,
+		IssueProjectID:    req.IssueProjectID,
+		CredentialRef:     req.CredentialRef,
+		ProjectToken:      req.ProjectToken,
+		SandboxPlanReview: req.SandboxPlanReview,
+		PollIntervalSec:   req.PollIntervalSec,
+		LabelAgentReady:   req.LabelAgentReady,
+		LabelInProgress:   req.LabelInProgress,
+		LabelHumanReview:  req.LabelHumanReview,
+		LabelRework:       req.LabelRework,
+		LabelVerified:     req.LabelVerified,
+		LabelMerged:       req.LabelMerged,
 	}
 	if req.Enabled != nil {
 		in.Enabled = *req.Enabled
@@ -542,29 +546,30 @@ func (s *Server) adminMetrics(ctx context.Context, c *app.RequestContext) {
 // toAdminProjectItem 执行相关逻辑。
 func toAdminProjectItem(row db.Project) adminProjectItem {
 	return adminProjectItem{
-		ID:               row.ID,
-		ProjectKey:       row.ProjectKey,
-		ProjectSlug:      row.ProjectSlug,
-		Name:             row.Name,
-		Provider:         row.Provider,
-		ProviderURL:      row.ProviderURL,
-		RepoURL:          row.RepoURL,
-		DefaultBranch:    row.DefaultBranch,
-		IssueProjectID:   row.IssueProjectID,
-		CredentialRef:    row.CredentialRef,
-		ProjectToken:     row.ProjectToken,
-		PollIntervalSec:  row.PollIntervalSec,
-		Enabled:          row.Enabled,
-		LastIssueSyncAt:  row.LastIssueSyncAt,
-		LabelAgentReady:  row.LabelAgentReady,
-		LabelInProgress:  row.LabelInProgress,
-		LabelHumanReview: row.LabelHumanReview,
-		LabelRework:      row.LabelRework,
-		LabelVerified:    row.LabelVerified,
-		LabelMerged:      row.LabelMerged,
-		CreatedBy:        row.CreatedBy,
-		CreatedAt:        row.CreatedAt,
-		UpdatedAt:        row.UpdatedAt,
+		ID:                row.ID,
+		ProjectKey:        row.ProjectKey,
+		ProjectSlug:       row.ProjectSlug,
+		Name:              row.Name,
+		Provider:          row.Provider,
+		ProviderURL:       row.ProviderURL,
+		RepoURL:           row.RepoURL,
+		DefaultBranch:     row.DefaultBranch,
+		IssueProjectID:    row.IssueProjectID,
+		CredentialRef:     row.CredentialRef,
+		ProjectToken:      row.ProjectToken,
+		SandboxPlanReview: row.SandboxPlanReview,
+		PollIntervalSec:   row.PollIntervalSec,
+		Enabled:           row.Enabled,
+		LastIssueSyncAt:   row.LastIssueSyncAt,
+		LabelAgentReady:   row.LabelAgentReady,
+		LabelInProgress:   row.LabelInProgress,
+		LabelHumanReview:  row.LabelHumanReview,
+		LabelRework:       row.LabelRework,
+		LabelVerified:     row.LabelVerified,
+		LabelMerged:       row.LabelMerged,
+		CreatedBy:         row.CreatedBy,
+		CreatedAt:         row.CreatedAt,
+		UpdatedAt:         row.UpdatedAt,
 	}
 }
 

@@ -18,16 +18,24 @@ var resultJSONRE = regexp.MustCompile("(?s)```RESULT_JSON\\s*(\\{.*?\\})\\s*```"
 
 // Client 表示数据结构定义。
 type Client struct {
-	binary string // binary 字段说明。
+	binary  string // binary 字段说明。
+	sandbox bool   // sandbox 字段说明。
 }
 
 // NewClient 执行相关逻辑。
-func NewClient(binary string) *Client {
+func NewClient(binary string, sandbox ...bool) *Client {
 	bin := strings.TrimSpace(binary)
 	if bin == "" {
 		bin = "codex"
 	}
-	return &Client{binary: bin}
+	useSandbox := true
+	if len(sandbox) > 0 {
+		useSandbox = sandbox[0]
+	}
+	return &Client{
+		binary:  bin,
+		sandbox: useSandbox,
+	}
 }
 
 // Name 是方法实现。
@@ -46,7 +54,16 @@ func (c *Client) Run(ctx context.Context, req base.InvokeRequest) (*base.InvokeR
 
 	// Best-effort codex invocation. If unavailable, return a deterministic fallback decision
 	// so the worker loop can continue in degraded mode.
-	cmd := exec.CommandContext(runCtx, c.binary, "exec", req.Prompt)
+	useSandbox := req.UseSandbox
+
+	args := []string{"exec", "--skip-git-repo-check"}
+	if useSandbox {
+		args = append(args, "--full-auto", "--sandbox", "workspace-write")
+	} else {
+		args = append(args, "--dangerously-bypass-approvals-and-sandbox")
+	}
+	args = append(args, req.Prompt)
+	cmd := exec.CommandContext(runCtx, c.binary, args...)
 	cmd.Dir = req.WorkDir
 	if len(req.Env) > 0 {
 		env := make([]string, 0, len(req.Env))

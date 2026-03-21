@@ -22,13 +22,14 @@ type Decision struct {
 
 // InvokeRequest 表示数据结构定义。
 type InvokeRequest struct {
-	RunKind string            // RunKind 字段说明。
-	Role    string            // Role 字段说明。
-	Prompt  string            // Prompt 字段说明。
-	WorkDir string            // WorkDir 字段说明。
-	RunDir  string            // RunDir 字段说明。
-	Timeout time.Duration     // Timeout 字段说明。
-	Env     map[string]string // Env 字段说明。
+	RunKind    string            // RunKind 字段说明。
+	Role       string            // Role 字段说明。
+	Prompt     string            // Prompt 字段说明。
+	WorkDir    string            // WorkDir 字段说明。
+	RunDir     string            // RunDir 字段说明。
+	Timeout    time.Duration     // Timeout 字段说明。
+	Env        map[string]string // Env 字段说明。
+	UseSandbox bool              // UseSandbox 字段说明。
 }
 
 // InvokeResult 表示数据结构定义。

@@ -87,30 +87,31 @@ type UserSession struct {
 
 // Project 表示数据结构定义。
 type Project struct {
-	ID               uint           `gorm:"primaryKey"`                                   // ID 字段说明。
-	ProjectKey       string         `gorm:"size:64;not null;uniqueIndex"`                 // ProjectKey 字段说明。
-	ProjectSlug      string         `gorm:"size:128;not null;uniqueIndex"`                // ProjectSlug 字段说明。
-	Name             string         `gorm:"size:128;not null"`                            // Name 字段说明。
-	Provider         string         `gorm:"size:16;not null;default:gitlab"`              // Provider 字段说明。
-	ProviderURL      string         `gorm:"size:255;not null"`                            // ProviderURL 字段说明。
-	RepoURL          string         `gorm:"type:text;not null"`                           // RepoURL 字段说明。
-	DefaultBranch    string         `gorm:"size:64;not null;default:main"`                // DefaultBranch 字段说明。
-	IssueProjectID   *string        `gorm:"size:64"`                                      // IssueProjectID 字段说明。
-	CredentialRef    string         `gorm:"size:128;not null"`                            // CredentialRef 字段说明。
-	ProjectToken     *string        `gorm:"type:text"`                                    // ProjectToken 字段说明。
-	PollIntervalSec  int            `gorm:"not null;default:60;index:idx_project_poll"`   // PollIntervalSec 字段说明。
-	Enabled          bool           `gorm:"not null;default:true;index:idx_project_poll"` // Enabled 字段说明。
-	LastIssueSyncAt  *time.Time     `gorm:"type:timestamp"`                               // LastIssueSyncAt 字段说明。
-	LabelAgentReady  string         `gorm:"size:64;not null;default:Agent Ready"`         // LabelAgentReady 字段说明。
-	LabelInProgress  string         `gorm:"size:64;not null;default:In Progress"`         // LabelInProgress 字段说明。
-	LabelHumanReview string         `gorm:"size:64;not null;default:Human Review"`        // LabelHumanReview 字段说明。
-	LabelRework      string         `gorm:"size:64;not null;default:Rework"`              // LabelRework 字段说明。
-	LabelVerified    string         `gorm:"size:64;not null;default:Verified"`            // LabelVerified 字段说明。
-	LabelMerged      string         `gorm:"size:64;not null;default:Merged"`              // LabelMerged 字段说明。
-	CreatedBy        uint           `gorm:"not null"`                                     // CreatedBy 字段说明。
-	CreatedAt        time.Time      `gorm:"not null"`                                     // CreatedAt 字段说明。
-	UpdatedAt        time.Time      `gorm:"not null"`                                     // UpdatedAt 字段说明。
-	DeletedAt        gorm.DeletedAt `gorm:"index"`                                        // DeletedAt 字段说明。
+	ID                uint           `gorm:"primaryKey"`                                   // ID 字段说明。
+	ProjectKey        string         `gorm:"size:64;not null;uniqueIndex"`                 // ProjectKey 字段说明。
+	ProjectSlug       string         `gorm:"size:128;not null;uniqueIndex"`                // ProjectSlug 字段说明。
+	Name              string         `gorm:"size:128;not null"`                            // Name 字段说明。
+	Provider          string         `gorm:"size:16;not null;default:gitlab"`              // Provider 字段说明。
+	ProviderURL       string         `gorm:"size:255;not null"`                            // ProviderURL 字段说明。
+	RepoURL           string         `gorm:"type:text;not null"`                           // RepoURL 字段说明。
+	DefaultBranch     string         `gorm:"size:64;not null;default:main"`                // DefaultBranch 字段说明。
+	IssueProjectID    *string        `gorm:"size:64"`                                      // IssueProjectID 字段说明。
+	CredentialRef     string         `gorm:"size:128;not null"`                            // CredentialRef 字段说明。
+	ProjectToken      *string        `gorm:"type:text"`                                    // ProjectToken 字段说明。
+	SandboxPlanReview bool           `gorm:"not null;default:false"`                       // SandboxPlanReview 字段说明。
+	PollIntervalSec   int            `gorm:"not null;default:60;index:idx_project_poll"`   // PollIntervalSec 字段说明。
+	Enabled           bool           `gorm:"not null;default:true;index:idx_project_poll"` // Enabled 字段说明。
+	LastIssueSyncAt   *time.Time     `gorm:"type:timestamp"`                               // LastIssueSyncAt 字段说明。
+	LabelAgentReady   string         `gorm:"size:64;not null;default:Agent Ready"`         // LabelAgentReady 字段说明。
+	LabelInProgress   string         `gorm:"size:64;not null;default:In Progress"`         // LabelInProgress 字段说明。
+	LabelHumanReview  string         `gorm:"size:64;not null;default:Human Review"`        // LabelHumanReview 字段说明。
+	LabelRework       string         `gorm:"size:64;not null;default:Rework"`              // LabelRework 字段说明。
+	LabelVerified     string         `gorm:"size:64;not null;default:Verified"`            // LabelVerified 字段说明。
+	LabelMerged       string         `gorm:"size:64;not null;default:Merged"`              // LabelMerged 字段说明。
+	CreatedBy         uint           `gorm:"not null"`                                     // CreatedBy 字段说明。
+	CreatedAt         time.Time      `gorm:"not null"`                                     // CreatedAt 字段说明。
+	UpdatedAt         time.Time      `gorm:"not null"`                                     // UpdatedAt 字段说明。
+	DeletedAt         gorm.DeletedAt `gorm:"index"`                                        // DeletedAt 字段说明。
 }
 
 // Issue 表示数据结构定义。

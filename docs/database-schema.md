@@ -50,6 +50,7 @@
 | default_branch | VARCHAR(64) | NOT NULL，默认 `main` |
 | issue_project_id | VARCHAR(64) NULL | 远端 issue 项目标识，可空 |
 | credential_ref | VARCHAR(128) | NOT NULL，密钥引用 |
+| sandbox_plan_review | BOOLEAN | NOT NULL，默认 FALSE；控制 plan/review 是否启用 sandbox（dev/merge 固定关闭） |
 | poll_interval_sec | INT | NOT NULL，默认 60 |
 | enabled | BOOLEAN | NOT NULL，默认 TRUE |
 | last_issue_sync_at | TIMESTAMP NULL | 项目 issue 同步游标（`updated_after`） |

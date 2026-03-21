@@ -17,7 +17,7 @@ func (c *Client) GetIssueByProjectIID(ctx context.Context, projectID uint, issue
 	}
 	var row Issue
 	err := c.db.WithContext(ctx).
-		Where("project_id = ? AND issue_iid = ?", projectID, issueIID).
+		Where(&Issue{ProjectID: projectID, IssueIID: issueIID}).
 		First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil

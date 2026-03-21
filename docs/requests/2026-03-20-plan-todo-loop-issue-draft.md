@@ -17,8 +17,18 @@
   - 在 `executeRun` 内通过 `for step := run.LoopStep; step <= run.MaxLoopStep; step++` 执行
   - 见 `internal/service/worker/service.go`
 - 当前流程没有 `plan` 角色，也没有“本地 todo 文件”协议。
+  - 2026-03-21 代码复核确认：
+    - `internal/dal/model.go` 仅定义 `dev/review/merge`，无 `AgentRolePlan`。
+    - `internal/service/worker/service.go` 主循环仍为 `(dev|merge) -> review`，`initialRole` 仅返回 `dev/merge`。
+    - `internal/infra/agent/prompts/defaults.go` 仅支持 `dev:dev / dev:review / merge:merge / merge:review`，无 `dev:plan`。
 - `CreateIssueNote` 当前只新增评论，不返回 note id，也无法修改历史评论。
+  - 2026-03-21 代码复核确认：
+    - `internal/infra/repo/common/port.go` 尚无 `GetIssue`、`UpdateIssueNote` 等接口。
+    - `internal/infra/repo/gitlab/client.go` 仅实现 `CreateIssueNote`，未实现 note 更新。
 - 同步 issue 时只拉取基础字段（title/state/labels/...），未包含 issue 描述正文，限制了计划拆解质量。
+  - 2026-03-21 代码复核确认：
+    - `issues` 模型尚无 `description` 字段，`issue_runs` 尚无 `todo_note_id` 字段。
+    - `internal/infra/agent/base/types.go` 的 `Decision` 结构尚无 `todo_stats/new_todo` 等 todo 语义字段。
 
 ## 2. 需求目标
 

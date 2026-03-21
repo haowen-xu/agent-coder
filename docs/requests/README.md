@@ -15,6 +15,7 @@
 
 ## 当前文档
 
+- [2026-03-21-webui-router-modularization-issue-draft.md](2026-03-21-webui-router-modularization-issue-draft.md)（WebUI 拆分与 Router 引入草案）
 - [2026-03-20-plan-todo-loop-issue-draft.md](2026-03-20-plan-todo-loop-issue-draft.md)（Plan/Todo 闭环改造草案）
 - [2026-03-20-agent-autocoding-final.md](2026-03-20-agent-autocoding-final.md)（当前定稿）
 - [2026-03-20-project-requirements-v1.md](2026-03-20-project-requirements-v1.md)

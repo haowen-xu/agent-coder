@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/haowen-xu/agent-coder/internal/xerr"
@@ -14,6 +16,8 @@ import (
 
 // Client 表示数据结构定义。
 type Client struct{}
+
+var sensitiveURLPattern = regexp.MustCompile(`https?://[^\s'"]+`)
 
 // NewClient 执行相关逻辑。
 func NewClient() *Client {
@@ -56,9 +60,28 @@ func (c *Client) EnsureIssueWorktree(
 	if _, err := c.run(ctx, repoPath, "fetch", "origin", "--prune"); err != nil {
 		return err
 	}
-	baseRef := "origin/" + defaultBranch
-	if ok, _ := c.remoteBranchExists(ctx, repoPath, branch); ok {
+
+	baseRef := "HEAD"
+	issueRemoteRef := "refs/remotes/origin/" + branch
+	if ok, _ := c.localRefExists(ctx, repoPath, issueRemoteRef); ok {
 		baseRef = "origin/" + branch
+	} else if ok, _ := c.remoteBranchExists(ctx, repoPath, branch); ok {
+		_, _ = c.run(ctx, repoPath, "fetch", "origin", branch+":"+issueRemoteRef)
+		if localOK, _ := c.localRefExists(ctx, repoPath, issueRemoteRef); localOK {
+			baseRef = "origin/" + branch
+		}
+	}
+
+	if baseRef == "HEAD" {
+		defaultRemoteRef := "refs/remotes/origin/" + defaultBranch
+		if ok, _ := c.localRefExists(ctx, repoPath, defaultRemoteRef); ok {
+			baseRef = "origin/" + defaultBranch
+		} else if ok, _ := c.remoteBranchExists(ctx, repoPath, defaultBranch); ok {
+			_, _ = c.run(ctx, repoPath, "fetch", "origin", defaultBranch+":"+defaultRemoteRef)
+			if localOK, _ := c.localRefExists(ctx, repoPath, defaultRemoteRef); localOK {
+				baseRef = "origin/" + defaultBranch
+			}
+		}
 	}
 
 	if _, err := c.run(ctx, repoPath, "worktree", "add", "--force", "--checkout", "-B", branch, worktreePath, baseRef); err != nil {
@@ -71,6 +94,18 @@ func (c *Client) EnsureIssueWorktree(
 		return err
 	}
 	return nil
+}
+
+// localRefExists 判断本地仓库引用是否存在。
+func (c *Client) localRefExists(ctx context.Context, repoPath string, ref string) (bool, error) {
+	_, err := c.run(ctx, repoPath, "show-ref", "--verify", "--quiet", ref)
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "not a valid ref") {
+			return false, nil
+		}
+		return false, nil
+	}
+	return true, nil
 }
 
 // TryMergeDefault 是 *Client 的方法实现。
@@ -133,7 +168,7 @@ func (c *Client) run(ctx context.Context, dir string, args ...string) (string, e
 		if out == "" {
 			out = err.Error()
 		}
-		return out, xerr.Infra.New("git %s failed: %s", strings.Join(args, " "), out)
+		return out, xerr.Infra.New("git %s failed: %s", maskSensitiveURL(strings.Join(args, " ")), maskSensitiveURL(out))
 	}
 	return strings.TrimSpace(stdout.String() + "\n" + stderr.String()), nil
 }
@@ -155,4 +190,24 @@ func sanitizePathPart(v string) string {
 	}
 	replaced := strings.NewReplacer("/", "_", "\\", "_", " ", "_").Replace(v)
 	return fmt.Sprintf("%s", replaced)
+}
+
+// maskSensitiveURL 会对 URL 中 userinfo 的密码部分做脱敏，防止 token 泄露到日志。
+func maskSensitiveURL(input string) string {
+	if strings.TrimSpace(input) == "" {
+		return input
+	}
+
+	return sensitiveURLPattern.ReplaceAllStringFunc(input, func(candidate string) string {
+		parsed, err := url.Parse(candidate)
+		if err != nil || parsed.User == nil {
+			return candidate
+		}
+		username := parsed.User.Username()
+		if username == "" {
+			username = "****"
+		}
+		parsed.User = url.UserPassword(username, "****")
+		return parsed.String()
+	})
 }

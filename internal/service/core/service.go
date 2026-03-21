@@ -169,24 +169,25 @@ func (s *Service) ListProjects(ctx context.Context) ([]db.Project, error) {
 
 // ProjectUpsertInput 表示数据结构定义。
 type ProjectUpsertInput struct {
-	ProjectKey       string  // ProjectKey 字段说明。
-	ProjectSlug      string  // ProjectSlug 字段说明。
-	Name             string  // Name 字段说明。
-	Provider         string  // Provider 字段说明。
-	ProviderURL      string  // ProviderURL 字段说明。
-	RepoURL          string  // RepoURL 字段说明。
-	DefaultBranch    string  // DefaultBranch 字段说明。
-	IssueProjectID   *string // IssueProjectID 字段说明。
-	CredentialRef    string  // CredentialRef 字段说明。
-	ProjectToken     *string // ProjectToken 字段说明。
-	PollIntervalSec  int     // PollIntervalSec 字段说明。
-	Enabled          bool    // Enabled 字段说明。
-	LabelAgentReady  string  // LabelAgentReady 字段说明。
-	LabelInProgress  string  // LabelInProgress 字段说明。
-	LabelHumanReview string  // LabelHumanReview 字段说明。
-	LabelRework      string  // LabelRework 字段说明。
-	LabelVerified    string  // LabelVerified 字段说明。
-	LabelMerged      string  // LabelMerged 字段说明。
+	ProjectKey        string  // ProjectKey 字段说明。
+	ProjectSlug       string  // ProjectSlug 字段说明。
+	Name              string  // Name 字段说明。
+	Provider          string  // Provider 字段说明。
+	ProviderURL       string  // ProviderURL 字段说明。
+	RepoURL           string  // RepoURL 字段说明。
+	DefaultBranch     string  // DefaultBranch 字段说明。
+	IssueProjectID    *string // IssueProjectID 字段说明。
+	CredentialRef     string  // CredentialRef 字段说明。
+	ProjectToken      *string // ProjectToken 字段说明。
+	SandboxPlanReview bool    // SandboxPlanReview 字段说明。
+	PollIntervalSec   int     // PollIntervalSec 字段说明。
+	Enabled           bool    // Enabled 字段说明。
+	LabelAgentReady   string  // LabelAgentReady 字段说明。
+	LabelInProgress   string  // LabelInProgress 字段说明。
+	LabelHumanReview  string  // LabelHumanReview 字段说明。
+	LabelRework       string  // LabelRework 字段说明。
+	LabelVerified     string  // LabelVerified 字段说明。
+	LabelMerged       string  // LabelMerged 字段说明。
 }
 
 // NormalizeProjectInput 执行相关逻辑。
@@ -273,25 +274,26 @@ func (s *Service) CreateProject(ctx context.Context, createdBy uint, in ProjectU
 		return nil, xerr.Config.New("project_key already exists")
 	}
 	row := &db.Project{
-		ProjectKey:       in.ProjectKey,
-		ProjectSlug:      in.ProjectSlug,
-		Name:             in.Name,
-		Provider:         in.Provider,
-		ProviderURL:      in.ProviderURL,
-		RepoURL:          in.RepoURL,
-		DefaultBranch:    in.DefaultBranch,
-		IssueProjectID:   in.IssueProjectID,
-		CredentialRef:    in.CredentialRef,
-		ProjectToken:     in.ProjectToken,
-		PollIntervalSec:  in.PollIntervalSec,
-		Enabled:          in.Enabled,
-		LabelAgentReady:  in.LabelAgentReady,
-		LabelInProgress:  in.LabelInProgress,
-		LabelHumanReview: in.LabelHumanReview,
-		LabelRework:      in.LabelRework,
-		LabelVerified:    in.LabelVerified,
-		LabelMerged:      in.LabelMerged,
-		CreatedBy:        createdBy,
+		ProjectKey:        in.ProjectKey,
+		ProjectSlug:       in.ProjectSlug,
+		Name:              in.Name,
+		Provider:          in.Provider,
+		ProviderURL:       in.ProviderURL,
+		RepoURL:           in.RepoURL,
+		DefaultBranch:     in.DefaultBranch,
+		IssueProjectID:    in.IssueProjectID,
+		CredentialRef:     in.CredentialRef,
+		ProjectToken:      in.ProjectToken,
+		SandboxPlanReview: in.SandboxPlanReview,
+		PollIntervalSec:   in.PollIntervalSec,
+		Enabled:           in.Enabled,
+		LabelAgentReady:   in.LabelAgentReady,
+		LabelInProgress:   in.LabelInProgress,
+		LabelHumanReview:  in.LabelHumanReview,
+		LabelRework:       in.LabelRework,
+		LabelVerified:     in.LabelVerified,
+		LabelMerged:       in.LabelMerged,
+		CreatedBy:         createdBy,
 	}
 	if err := s.db.CreateProject(ctx, row); err != nil {
 		return nil, err
@@ -327,6 +329,7 @@ func (s *Service) UpdateProject(ctx context.Context, projectKey string, in Proje
 	row.IssueProjectID = in.IssueProjectID
 	row.CredentialRef = in.CredentialRef
 	row.ProjectToken = in.ProjectToken
+	row.SandboxPlanReview = in.SandboxPlanReview
 	row.PollIntervalSec = in.PollIntervalSec
 	row.Enabled = in.Enabled
 	row.LabelAgentReady = in.LabelAgentReady
