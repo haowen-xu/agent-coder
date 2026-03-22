@@ -1,6 +1,6 @@
 # Agent 运行设计（当前实现）
 
-> 范围：`internal/infra/agent/*` + `internal/service/worker` 的实际行为。
+> 范围：`internal/infra/agent/*` + `internal/service/orch` 的实际行为。
 
 ## 1. 目录结构
 
@@ -61,7 +61,7 @@ internal/infra/agent/
 
 ## 4. Worker 对 Agent 的调用约定
 
-调用点：`internal/service/worker/service.go`
+调用点：`internal/service/orch/*.go`
 
 - 每轮先执行主角色：
   - `run_kind=dev` -> `role=dev`

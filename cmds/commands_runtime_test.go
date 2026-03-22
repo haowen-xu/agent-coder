@@ -15,19 +15,19 @@ import (
 	"github.com/haowen-xu/agent-coder/internal/infra/secret"
 
 	"github.com/haowen-xu/agent-coder/internal/app"
-	"github.com/haowen-xu/agent-coder/internal/service/worker"
+	orchsvc "github.com/haowen-xu/agent-coder/internal/service/orch"
 )
 
 type depsSnapshot struct {
 	newApplication    func(context.Context, string) (*app.App, error)
-	newWorkerSvc      func(*appcfg.Config, *slog.Logger, *db.Client, *promptstore.Service, secret.Manager) *worker.Service
+	newWorkerSvc      func(*appcfg.Config, *slog.Logger, *db.Client, *promptstore.Service, secret.Manager) *orchsvc.Service
 	notifySignals     func(chan<- os.Signal, ...os.Signal)
 	stopSignals       func(chan<- os.Signal)
 	runServer         func(*app.App) error
 	shutdownServer    func(*app.App, context.Context) error
 	ensureWebUIAssets func() error
-	runWorkerLoop     func(*worker.Service, context.Context) error
-	runWorkerOnce     func(*worker.Service, context.Context) error
+	runWorkerLoop     func(*orchsvc.Service, context.Context) error
+	runWorkerOnce     func(*orchsvc.Service, context.Context) error
 }
 
 func patchDeps(t *testing.T) {
@@ -141,14 +141,14 @@ func TestWorkerCmdRunE_ErrorAndSignalPaths(t *testing.T) {
 	newApplication = func(_ context.Context, _ string) (*app.App, error) {
 		return &app.App{Config: &appcfg.Config{}}, nil
 	}
-	newWorkerSvc = func(*appcfg.Config, *slog.Logger, *db.Client, *promptstore.Service, secret.Manager) *worker.Service {
+	newWorkerSvc = func(*appcfg.Config, *slog.Logger, *db.Client, *promptstore.Service, secret.Manager) *orchsvc.Service {
 		return nil
 	}
 	stopSignals = func(chan<- os.Signal) {}
 
 	t.Run("worker_loop_error", func(t *testing.T) {
 		wantErr := errors.New("worker loop failed")
-		runWorkerLoop = func(_ *worker.Service, _ context.Context) error { return wantErr }
+		runWorkerLoop = func(_ *orchsvc.Service, _ context.Context) error { return wantErr }
 		notifySignals = func(chan<- os.Signal, ...os.Signal) {}
 
 		cmd := workerCmd()
@@ -158,7 +158,7 @@ func TestWorkerCmdRunE_ErrorAndSignalPaths(t *testing.T) {
 	})
 
 	t.Run("signal_cancel", func(t *testing.T) {
-		runWorkerLoop = func(_ *worker.Service, _ context.Context) error {
+		runWorkerLoop = func(_ *orchsvc.Service, _ context.Context) error {
 			time.Sleep(120 * time.Millisecond)
 			return nil
 		}
@@ -179,10 +179,10 @@ func TestMigrateAndSyncIssuesSuccessPaths(t *testing.T) {
 	newApplication = func(_ context.Context, _ string) (*app.App, error) {
 		return &app.App{Config: &appcfg.Config{}}, nil
 	}
-	newWorkerSvc = func(*appcfg.Config, *slog.Logger, *db.Client, *promptstore.Service, secret.Manager) *worker.Service {
+	newWorkerSvc = func(*appcfg.Config, *slog.Logger, *db.Client, *promptstore.Service, secret.Manager) *orchsvc.Service {
 		return nil
 	}
-	runWorkerOnce = func(_ *worker.Service, _ context.Context) error { return nil }
+	runWorkerOnce = func(_ *orchsvc.Service, _ context.Context) error { return nil }
 
 	migrate := migrateCmd()
 	if err := migrate.RunE(migrate, nil); err != nil {

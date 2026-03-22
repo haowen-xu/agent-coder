@@ -11,24 +11,24 @@ import (
 	db "github.com/haowen-xu/agent-coder/internal/dal"
 	"github.com/haowen-xu/agent-coder/internal/infra/agent/promptstore"
 	"github.com/haowen-xu/agent-coder/internal/infra/secret"
-	"github.com/haowen-xu/agent-coder/internal/service/worker"
+	orchsvc "github.com/haowen-xu/agent-coder/internal/service/orch"
 )
 
 var (
 	newApplication    func(context.Context, string) (*app.App, error)
-	newWorkerSvc      func(*config.Config, *slog.Logger, *db.Client, *promptstore.Service, secret.Manager) *worker.Service
+	newWorkerSvc      func(*config.Config, *slog.Logger, *db.Client, *promptstore.Service, secret.Manager) *orchsvc.Service
 	notifySignals     func(chan<- os.Signal, ...os.Signal)
 	stopSignals       func(chan<- os.Signal)
 	runServer         func(*app.App) error
 	shutdownServer    func(*app.App, context.Context) error
 	ensureWebUIAssets func() error
-	runWorkerLoop     func(*worker.Service, context.Context) error
-	runWorkerOnce     func(*worker.Service, context.Context) error
+	runWorkerLoop     func(*orchsvc.Service, context.Context) error
+	runWorkerOnce     func(*orchsvc.Service, context.Context) error
 )
 
 func init() {
 	newApplication = app.New
-	newWorkerSvc = worker.New
+	newWorkerSvc = orchsvc.New
 	notifySignals = signal.Notify
 	stopSignals = signal.Stop
 	runServer = defaultRunServer
@@ -46,10 +46,10 @@ func defaultShutdownServer(application *app.App, ctx context.Context) error {
 	return application.Server.Shutdown(ctx)
 }
 
-func defaultRunWorkerLoop(wk *worker.Service, ctx context.Context) error {
+func defaultRunWorkerLoop(wk *orchsvc.Service, ctx context.Context) error {
 	return wk.RunLoop(ctx)
 }
 
-func defaultRunWorkerOnce(wk *worker.Service, ctx context.Context) error {
+func defaultRunWorkerOnce(wk *orchsvc.Service, ctx context.Context) error {
 	return wk.RunOnce(ctx)
 }

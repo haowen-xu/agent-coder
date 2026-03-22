@@ -54,7 +54,7 @@
 │   │   ├── issue_run/
 │   │   ├── ops/
 │   │   ├── core/                # legacy 兼容层，逐步迁移中
-│   │   └── worker/
+│   │   └── orch/
 │   ├── infra/
 │   │   ├── agent/
 │   │   │   ├── base/

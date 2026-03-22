@@ -49,7 +49,7 @@
 - `internal/handler/*`：按对象拆分的 Hertz Handler（`auth/user/project/issue/issue_run/ops`）
 - `internal/service/*`：按对象拆分的业务服务（`user/project/issue/issue_run/ops`）
 - `internal/service/core`：历史兼容服务层（逐步迁移中）
-- `internal/service/worker`：调度与状态机执行
+- `internal/service/orch`：调度与状态机执行（orchestrator service）
 - `internal/dal`：GORM 数据访问（SQLite/PostgreSQL）
 - `internal/infra/repo/*`：仓库协作平台实现（当前 GitLab）
 - `internal/infra/agent/*`：Agent 执行实现（当前 Codex）
