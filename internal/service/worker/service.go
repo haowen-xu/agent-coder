@@ -21,6 +21,7 @@ import (
 	repocommon "github.com/haowen-xu/agent-coder/internal/infra/repo/common"
 	"github.com/haowen-xu/agent-coder/internal/infra/repo/gitlab"
 	"github.com/haowen-xu/agent-coder/internal/infra/secret"
+	"github.com/haowen-xu/agent-coder/internal/utils"
 )
 
 // Service 表示数据结构定义。
@@ -103,7 +104,7 @@ func (s *Service) RunOnce(ctx context.Context) error {
 		if err := s.syncProjectIssues(ctx, project); err != nil {
 			s.log.Error("sync project issues failed", slog.String("project_key", project.ProjectKey), slog.Any("error", err))
 		}
-		s.lastPolled[project.ID] = time.Now()
+		s.lastPolled[project.ID] = utils.NowUTC()
 	}
 	if err := s.scheduleRuns(ctx); err != nil {
 		return err
@@ -224,10 +225,10 @@ func (s *Service) syncProjectIssues(ctx context.Context, project db.Project) err
 				Title:           it.Title,
 				State:           it.State,
 				LabelsJSON:      string(labelsJSON),
-				RegisteredAt:    time.Now(),
+				RegisteredAt:    utils.NowUTC(),
 				LifecycleStatus: lifecycleStatus,
 				IssueDir:        "",
-				LastSyncedAt:    time.Now(),
+				LastSyncedAt:    utils.NowUTC(),
 				ClosedAt:        it.ClosedAt,
 				CloseReason:     closeReason,
 			}
@@ -247,7 +248,7 @@ func (s *Service) syncProjectIssues(ctx context.Context, project db.Project) err
 		localIssue.Title = it.Title
 		localIssue.State = it.State
 		localIssue.LabelsJSON = string(labelsJSON)
-		localIssue.LastSyncedAt = time.Now()
+		localIssue.LastSyncedAt = utils.NowUTC()
 		localIssue.ClosedAt = it.ClosedAt
 		localIssue.LifecycleStatus, localIssue.CloseReason = s.mapLifecycleByRemote(localIssue.LifecycleStatus, localIssue.CloseReason, project, it.Labels, it.State)
 		if localIssue.IssueDir == "" {
@@ -258,7 +259,7 @@ func (s *Service) syncProjectIssues(ctx context.Context, project db.Project) err
 		}
 	}
 	if lastIssueSyncAt.IsZero() {
-		lastIssueSyncAt = time.Now().UTC()
+		lastIssueSyncAt = utils.NowUTC()
 	}
 	project.LastIssueSyncAt = &lastIssueSyncAt
 	if err := s.db.SaveProject(ctx, &project); err != nil {
@@ -307,7 +308,7 @@ func (s *Service) scheduleRuns(ctx context.Context) error {
 			AgentRole:        initialRole(runKind),
 			LoopStep:         1,
 			MaxLoopStep:      s.cfg.Agent.Codex.MaxLoopStep,
-			QueuedAt:         time.Now(),
+			QueuedAt:         utils.NowUTC(),
 			BranchName:       branch,
 			GitTreePath:      paths.GitTree,
 			AgentRunDir:      paths.RunDir,
@@ -329,7 +330,7 @@ func (s *Service) scheduleRuns(ctx context.Context) error {
 			return err
 		}
 		if !bound {
-			now := time.Now()
+			now := utils.NowUTC()
 			row.Status = db.RunStatusCanceled
 			row.FinishedAt = &now
 			row.ErrorSummary = stringPtr("enqueue skipped: issue already bound by another worker")
@@ -369,7 +370,7 @@ func (s *Service) executeRun(ctx context.Context, run *db.IssueRun) error {
 
 	run.Status = db.RunStatusRunning
 	if run.StartedAt == nil || run.StartedAt.IsZero() {
-		now := time.Now()
+		now := utils.NowUTC()
 		run.StartedAt = &now
 	}
 	repoPath, err := s.git.EnsureProjectRepo(ctx, s.cfg.Work.WorkDir, strings.TrimSpace(project.RepoURL), project.ProjectKey, repoToken)
@@ -473,7 +474,7 @@ func (s *Service) executeRun(ctx context.Context, run *db.IssueRun) error {
 		}
 	}
 
-	finishedAt := time.Now()
+	finishedAt := utils.NowUTC()
 	run.FinishedAt = &finishedAt
 	if failed {
 		run.Status = db.RunStatusFailed
@@ -758,7 +759,7 @@ func (s *Service) appendDecisionLog(ctx context.Context, runID uint, stage strin
 	row := &db.RunLog{
 		RunID:       runID,
 		Seq:         seq,
-		At:          time.Now(),
+		At:          utils.NowUTC(),
 		Level:       "INFO",
 		Stage:       stage,
 		EventType:   eventType,

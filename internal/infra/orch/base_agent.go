@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	agentbase "github.com/haowen-xu/agent-coder/internal/infra/agent/base"
 	repocommon "github.com/haowen-xu/agent-coder/internal/infra/repo/common"
+	"github.com/haowen-xu/agent-coder/internal/utils"
 )
 
 // AgentKind 表示 OrchAgent 类型。
@@ -124,7 +124,7 @@ func (a *orchBaseAgent) Run(ctx context.Context) error {
 				Kind:       a.kind,
 				Status:     "running",
 				ProjectKey: a.projectKey,
-				UpdatedAt:  time.Now().UTC(),
+				UpdatedAt:  utils.NowUTC(),
 			})
 		}
 	}
@@ -158,7 +158,7 @@ func (a *orchBaseAgent) writeFinalState(err error) {
 		Kind:       a.kind,
 		Status:     "succeeded",
 		ProjectKey: a.projectKey,
-		UpdatedAt:  time.Now().UTC(),
+		UpdatedAt:  utils.NowUTC(),
 	}
 	if err != nil {
 		state.Status = "failed"

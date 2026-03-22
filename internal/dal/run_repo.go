@@ -3,10 +3,10 @@ package db
 import (
 	"context"
 	"errors"
-	"time"
 
 	"gorm.io/gorm"
 
+	"github.com/haowen-xu/agent-coder/internal/utils"
 	"github.com/haowen-xu/agent-coder/internal/xerr"
 )
 
@@ -117,7 +117,7 @@ func (c *Client) ClaimNextQueuedRun(ctx context.Context) (*IssueRun, error) {
 				return queryErr
 			}
 
-			now := time.Now()
+			now := utils.NowUTC()
 			res := tx.Model(&IssueRun{}).
 				Where("id = ? AND status = ?", row.ID, RunStatusQueued).
 				Updates(map[string]any{
@@ -169,7 +169,7 @@ func (c *Client) AppendRunLog(ctx context.Context, row *RunLog) error {
 		return xerr.Infra.New("db is not initialized")
 	}
 	if row.At.IsZero() {
-		row.At = time.Now()
+		row.At = utils.NowUTC()
 	}
 	if err := c.db.WithContext(ctx).Create(row).Error; err != nil {
 		return xerr.Infra.Wrap(err, "append run log")

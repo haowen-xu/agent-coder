@@ -92,7 +92,7 @@
 
 - 后端：
   - `go test ./...`
-  - `./scripts/check_go_coverage_gate.sh`
+  - `.venv/bin/python scripts/agents/check_go_coverage_gate.py`
 - 前端：`cd webui && pnpm build`
 - 权限：
   - admin 可管理用户/项目

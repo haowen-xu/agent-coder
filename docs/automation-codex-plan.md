@@ -44,5 +44,5 @@ python3 scripts/run_codex_on_plan.py \
 ## 范围说明
 
 - 当前自动化仅覆盖 `scripts/run_codex_on_plan.py`。
-- 仓库内不再维护内置 agents 脚本（统一由外部 Agent-Coder 管理）。
+- 门禁脚本统一维护在 `scripts/agents/`。
 - Autofix 产物目录统一使用 `.ai-docs/autofix/`。

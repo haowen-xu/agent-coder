@@ -5,13 +5,17 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/haowen-xu/agent-coder/internal/app/httpserver"
 	"github.com/haowen-xu/agent-coder/internal/config"
 	"github.com/haowen-xu/agent-coder/internal/dal"
-	"github.com/haowen-xu/agent-coder/internal/handler/httpserver"
 	"github.com/haowen-xu/agent-coder/internal/infra/agent/promptstore"
 	"github.com/haowen-xu/agent-coder/internal/infra/secret"
 	"github.com/haowen-xu/agent-coder/internal/logger"
-	"github.com/haowen-xu/agent-coder/internal/service/core"
+	issuesvc "github.com/haowen-xu/agent-coder/internal/service/issue"
+	issuerunsvc "github.com/haowen-xu/agent-coder/internal/service/issue_run"
+	opssvc "github.com/haowen-xu/agent-coder/internal/service/ops"
+	projectsvc "github.com/haowen-xu/agent-coder/internal/service/project"
+	usersvc "github.com/haowen-xu/agent-coder/internal/service/user"
 	"github.com/haowen-xu/agent-coder/internal/xerr"
 )
 
@@ -22,7 +26,11 @@ type App struct {
 	DB          *db.Client           // DB 字段说明。
 	Secret      secret.Manager       // Secret 字段说明。
 	PromptStore *promptstore.Service // PromptStore 字段说明。
-	CoreService *core.Service        // CoreService 字段说明。
+	UserService *usersvc.Service     // UserService 字段说明。
+	ProjectSvc  *projectsvc.Service  // ProjectSvc 字段说明。
+	IssueSvc    *issuesvc.Service    // IssueSvc 字段说明。
+	IssueRunSvc *issuerunsvc.Service // IssueRunSvc 字段说明。
+	OpsSvc      *opssvc.Service      // OpsSvc 字段说明。
 	Server      *httpserver.Server   // Server 字段说明。
 }
 
@@ -56,15 +64,23 @@ func New(ctx context.Context, configPath string) (*App, error) {
 		return nil, xerr.Startup.New("unsupported secret provider: %s", cfg.Secret.Provider)
 	}
 	promptService := promptstore.NewService(dbClient)
-	coreService := core.New(cfg, dbClient, promptService)
-	srv := httpserver.New(cfg, log, dbClient, coreService)
+	userService := usersvc.New(cfg, dbClient)
+	projectService := projectsvc.New(cfg, dbClient, promptService)
+	issueService := issuesvc.New(dbClient)
+	issueRunService := issuerunsvc.New(dbClient)
+	opsService := opssvc.New(dbClient)
+	srv := httpserver.New(cfg, log, dbClient, userService, projectService, issueService, issueRunService, opsService)
 	return &App{
 		Config:      cfg,
 		Logger:      log,
 		DB:          dbClient,
 		Secret:      secretMgr,
 		PromptStore: promptService,
-		CoreService: coreService,
+		UserService: userService,
+		ProjectSvc:  projectService,
+		IssueSvc:    issueService,
+		IssueRunSvc: issueRunService,
+		OpsSvc:      opsService,
 		Server:      srv,
 	}, nil
 }

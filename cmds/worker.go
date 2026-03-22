@@ -3,13 +3,9 @@ package main
 import (
 	"context"
 	"os"
-	"os/signal"
 	"syscall"
 
 	"github.com/spf13/cobra"
-
-	"github.com/haowen-xu/agent-coder/internal/app"
-	"github.com/haowen-xu/agent-coder/internal/service/worker"
 )
 
 // workerCmd 执行相关逻辑。
@@ -21,13 +17,13 @@ func workerCmd() *cobra.Command {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			application, err := app.New(ctx, configPath)
+			application, err := newApplication(ctx, configPath)
 			if err != nil {
 				return err
 			}
 			defer func() { _ = application.Close() }()
 
-			wk := worker.New(
+			wk := newWorkerSvc(
 				application.Config,
 				application.Logger,
 				application.DB,
@@ -36,12 +32,14 @@ func workerCmd() *cobra.Command {
 			)
 
 			errCh := make(chan error, 1)
+			runWorkerLoopFn := runWorkerLoop
 			go func() {
-				errCh <- wk.RunLoop(ctx)
+				errCh <- runWorkerLoopFn(wk, ctx)
 			}()
 
 			sigCh := make(chan os.Signal, 1)
-			signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+			notifySignals(sigCh, syscall.SIGINT, syscall.SIGTERM)
+			defer stopSignals(sigCh)
 
 			select {
 			case err := <-errCh:

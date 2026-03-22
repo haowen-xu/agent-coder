@@ -12,6 +12,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/haowen-xu/agent-coder/internal/config"
+	"github.com/haowen-xu/agent-coder/internal/utils"
 	"github.com/haowen-xu/agent-coder/internal/xerr"
 )
 
@@ -34,7 +35,9 @@ func New(ctx context.Context, cfg config.DBConfig, log *slog.Logger) (*Client, e
 		return nil, err
 	}
 
-	gdb, err := gorm.Open(dialector, &gorm.Config{})
+	gdb, err := gorm.Open(dialector, &gorm.Config{
+		NowFunc: utils.NowUTC,
+	})
 	if err != nil {
 		return nil, xerr.Infra.Wrap(err, "open gorm db")
 	}

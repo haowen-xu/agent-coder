@@ -9,6 +9,7 @@
 - 数据库设计: [docs/database-schema.md](docs/database-schema.md)
 - Agent 运行设计: [docs/agent-runtime.md](docs/agent-runtime.md)
 - 配置与运行时规范: [docs/config-runtime.md](docs/config-runtime.md)
+- 时间与时区规范: [docs/datetime-timezone.md](docs/datetime-timezone.md)
 - 自动化执行流: [docs/automation-codex-plan.md](docs/automation-codex-plan.md)
 - 代码规范: [docs/code-style/README.md](docs/code-style/README.md)
 - 产品需求定稿: [docs/requirements.md](docs/requirements.md)
@@ -18,4 +19,4 @@
 
 - 计划执行自动化目前仅支持 `scripts/run_codex_on_plan.py`。
 - Autofix 产物目录统一使用 `.ai-docs/autofix/`。
-- 仓库内不再维护内置 agents 脚本，统一由外部 Agent-Coder 管理。
+- 门禁脚本统一放在 `scripts/agents/`，使用 Python 实现并要求通过仓库根目录 `.venv` 执行。

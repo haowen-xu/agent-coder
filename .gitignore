@@ -22,6 +22,10 @@ __pycache__/
 # Frontend
 webui/node_modules/
 webui/dist/
+webui/playwright-report/
+webui/test-results/
+internal/app/httpserver/static/*
+!internal/app/httpserver/static/index.html
 
 # OS/Editor
 .DS_Store

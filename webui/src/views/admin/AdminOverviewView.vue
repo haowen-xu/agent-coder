@@ -23,7 +23,7 @@
           <el-descriptions-item label="Health">{{ health.status }}</el-descriptions-item>
           <el-descriptions-item label="DB">{{ health.db }}</el-descriptions-item>
           <el-descriptions-item label="Env">{{ health.meta?.app?.env ?? '-' }}</el-descriptions-item>
-          <el-descriptions-item label="Now">{{ health.meta?.now ?? '-' }}</el-descriptions-item>
+          <el-descriptions-item label="Now">{{ formatLocalDateTime(health.meta?.now) }}</el-descriptions-item>
         </el-descriptions>
       </el-card>
     </el-col>
@@ -49,6 +49,7 @@ import { useRouter } from 'vue-router'
 import { useAdminStore } from '../../stores/admin'
 import { useHealthStore } from '../../stores/health'
 import { useSessionStore } from '../../stores/session'
+import { formatLocalDateTime } from '../../utils/format'
 
 const router = useRouter()
 const session = useSessionStore()

@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build && node scripts/postbuild-gzip.mjs",
     "preview": "vite preview",
-    "test:e2e": "playwright test -c playwright.e2e.config.ts"
+    "test:e2e": "cd .. && .venv/bin/python -m unittest tests.playwright.test_playwright_e2e -v"
   },
   "dependencies": {
     "element-plus": "^2.11.4",

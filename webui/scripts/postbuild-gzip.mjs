@@ -9,7 +9,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const webuiRoot = resolve(__dirname, '..')
 const distDir = resolve(webuiRoot, 'dist')
-const staticDir = resolve(webuiRoot, '../internal/handler/httpserver/static')
+const staticDir = resolve(webuiRoot, '../internal/app/httpserver/static')
 
 const gzipExts = new Set([
   '.js',

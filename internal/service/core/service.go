@@ -15,6 +15,7 @@ import (
 	"github.com/haowen-xu/agent-coder/internal/infra/agent/promptstore"
 	repocommon "github.com/haowen-xu/agent-coder/internal/infra/repo/common"
 	"github.com/haowen-xu/agent-coder/internal/infra/repo/gitlab"
+	"github.com/haowen-xu/agent-coder/internal/utils"
 	"github.com/haowen-xu/agent-coder/internal/xerr"
 )
 
@@ -64,7 +65,7 @@ func (s *Service) Login(ctx context.Context, username string, password string) (
 	if err != nil {
 		return "", time.Time{}, nil, xerr.Infra.Wrap(err, "new session token")
 	}
-	now := time.Now()
+	now := utils.NowUTC()
 	expiredAt := now.Add(s.cfg.Auth.SessionTTLDuration())
 	sess := &db.UserSession{
 		UserID:    user.ID,
@@ -493,7 +494,7 @@ func (s *Service) CancelRun(ctx context.Context, runID uint, reason string) (*db
 	if row.Status != db.RunStatusQueued && row.Status != db.RunStatusRunning {
 		return nil, xerr.Config.New("run is not cancelable")
 	}
-	now := time.Now()
+	now := utils.NowUTC()
 	row.Status = db.RunStatusCanceled
 	row.FinishedAt = &now
 	if strings.TrimSpace(reason) != "" {
@@ -591,7 +592,7 @@ func (s *Service) GetOpsMetrics(ctx context.Context) (*OpsMetrics, error) {
 		return nil, err
 	}
 	return &OpsMetrics{
-		Timestamp: time.Now(),
+		Timestamp: utils.NowUTC(),
 		Projects: OpsProjectsMetric{
 			Total:   projectTotal,
 			Enabled: projectEnabled,

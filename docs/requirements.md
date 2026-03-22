@@ -69,6 +69,14 @@
   - 总体覆盖率 `>= 80%`
   - 含具体代码逻辑的 Go 文件不允许 `0%` 覆盖率
   - 单元测试文件必须与被测文件同名配对：`xxx.go` 对应 `xxx_test.go`
+- 测试分层约束：
+  - 简单 e2e/集成测试（不需要多系统/外部系统协作）必须用 Go 测试方式实现，并包含在 `make test`
+  - 复杂多系统/外部系统协作测试放在 `tests/e2e/`，由 Python `unittest` 脚本编排环境并验证 API/数据库/文件系统状态
+  - 前端行为 e2e 测试放在 `tests/playwright/`，由 Python `unittest` 脚本编排环境并调用 Playwright，必要时验证 API/数据库/文件系统状态
+- 时间与时区门禁：
+  - Go 生产代码统一使用 `internal/utils.NowUTC()` 获取当前时间
+  - 时间传输格式统一为 UTC RFC3339（ISO）
+  - WebUI 时间展示统一使用 `webui/src/utils/format.ts` 的 `formatLocalDateTime`
 
 ## 9.1 项目标识约束
 

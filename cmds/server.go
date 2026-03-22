@@ -3,12 +3,9 @@ package main
 import (
 	"context"
 	"os"
-	"os/signal"
 	"syscall"
 
 	"github.com/spf13/cobra"
-
-	"github.com/haowen-xu/agent-coder/internal/app"
 )
 
 // serverCmd 执行相关逻辑。
@@ -17,20 +14,25 @@ func serverCmd() *cobra.Command {
 		Use:   "server",
 		Short: "Start HTTP server",
 		RunE: func(_ *cobra.Command, _ []string) error {
+			if err := ensureWebUIAssets(); err != nil {
+				return err
+			}
 			ctx := context.Background()
-			application, err := app.New(ctx, configPath)
+			application, err := newApplication(ctx, configPath)
 			if err != nil {
 				return err
 			}
 			defer func() { _ = application.Close() }()
 
 			errCh := make(chan error, 1)
+			runServerFn := runServer
 			go func() {
-				errCh <- application.Server.Run()
+				errCh <- runServerFn(application)
 			}()
 
 			sigCh := make(chan os.Signal, 1)
-			signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+			notifySignals(sigCh, syscall.SIGINT, syscall.SIGTERM)
+			defer stopSignals(sigCh)
 
 			select {
 			case err := <-errCh:
@@ -38,7 +40,7 @@ func serverCmd() *cobra.Command {
 			case <-sigCh:
 				shutdownCtx, cancel := context.WithTimeout(context.Background(), application.Config.Server.ShutdownTimeoutDuration())
 				defer cancel()
-				return application.Server.Shutdown(shutdownCtx)
+				return shutdownServer(application, shutdownCtx)
 			}
 		},
 	}

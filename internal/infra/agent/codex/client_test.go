@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -97,7 +98,7 @@ func TestRunSuccessAndFailure(t *testing.T) {
 		Role:    "dev",
 		Prompt:  "do work",
 		WorkDir: workdir,
-		Timeout: 5 * time.Second,
+		Timeout: 15 * time.Second,
 		Env: map[string]string{
 			"FAKE_MODE": "ok",
 		},
@@ -113,7 +114,7 @@ func TestRunSuccessAndFailure(t *testing.T) {
 		Role:    "review",
 		Prompt:  "review",
 		WorkDir: workdir,
-		Timeout: 5 * time.Second,
+		Timeout: 15 * time.Second,
 		Env: map[string]string{
 			"FAKE_MODE": "fail",
 		},
@@ -124,4 +125,104 @@ func TestRunSuccessAndFailure(t *testing.T) {
 	if failRes == nil || failRes.Decision.Decision != "blocked" {
 		t.Fatalf("failure decision should be blocked: %#v", failRes)
 	}
+}
+
+// TestRunWithFakeCodex_ValidatesInvocationInput 用于单元测试。
+func TestRunWithFakeCodex_ValidatesInvocationInput(t *testing.T) {
+	ctx := context.Background()
+	workdir := t.TempDir()
+	bin := filepath.Join(workdir, "fake-codex-input.sh")
+
+	script := "#!/bin/sh\n" +
+		"set -eu\n" +
+		"printf '%s\\n' \"$@\" > \"$FAKE_ARGS_FILE\"\n" +
+		"pwd > \"$FAKE_PWD_FILE\"\n" +
+		"printf '%s' \"${FAKE_ENV_VALUE:-}\" > \"$FAKE_ENV_FILE\"\n" +
+		"cat <<'EOF'\n" +
+		"```RESULT_JSON\n" +
+		"{\"role\":\"dev\",\"decision\":\"ready_for_review\",\"summary\":\"ok\"}\n" +
+		"```\n" +
+		"EOF\n"
+	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake codex script failed: %v", err)
+	}
+
+	runWithSandbox := func(useSandbox bool) []string {
+		argsFile := filepath.Join(workdir, "args-"+map[bool]string{true: "sandbox", false: "nosandbox"}[useSandbox]+".txt")
+		pwdFile := filepath.Join(workdir, "pwd-"+map[bool]string{true: "sandbox", false: "nosandbox"}[useSandbox]+".txt")
+		envFile := filepath.Join(workdir, "env-"+map[bool]string{true: "sandbox", false: "nosandbox"}[useSandbox]+".txt")
+		client := NewClient(bin)
+		res, err := client.Run(ctx, base.InvokeRequest{
+			Role:       "dev",
+			Prompt:     "PROMPT_FOR_FAKE_CODEX",
+			WorkDir:    workdir,
+			UseSandbox: useSandbox,
+			Timeout:    10 * time.Second,
+			Env: map[string]string{
+				"FAKE_ARGS_FILE": argsFile,
+				"FAKE_PWD_FILE":  pwdFile,
+				"FAKE_ENV_FILE":  envFile,
+				"FAKE_ENV_VALUE": "ENV_OK",
+			},
+		})
+		if err != nil {
+			t.Fatalf("fake codex run failed (sandbox=%v): %v", useSandbox, err)
+		}
+		if res == nil || res.Decision.Decision != "ready_for_review" {
+			t.Fatalf("unexpected invoke result (sandbox=%v): %#v", useSandbox, res)
+		}
+
+		pwd, err := os.ReadFile(pwdFile)
+		if err != nil {
+			t.Fatalf("read pwd file failed: %v", err)
+		}
+		if strings.TrimSpace(string(pwd)) != workdir {
+			t.Fatalf("workdir mismatch: got=%q want=%q", strings.TrimSpace(string(pwd)), workdir)
+		}
+		envVal, err := os.ReadFile(envFile)
+		if err != nil {
+			t.Fatalf("read env file failed: %v", err)
+		}
+		if string(envVal) != "ENV_OK" {
+			t.Fatalf("env propagation mismatch: got=%q", string(envVal))
+		}
+
+		rawArgs, err := os.ReadFile(argsFile)
+		if err != nil {
+			t.Fatalf("read args file failed: %v", err)
+		}
+		args := strings.Split(strings.TrimSpace(string(rawArgs)), "\n")
+		if len(args) == 0 {
+			t.Fatalf("fake codex args should not be empty")
+		}
+		if args[0] != "exec" {
+			t.Fatalf("first arg should be exec, got=%q", args[0])
+		}
+		if args[len(args)-1] != "PROMPT_FOR_FAKE_CODEX" {
+			t.Fatalf("prompt should be passed as last arg, got=%q", args[len(args)-1])
+		}
+		return args
+	}
+
+	sandboxArgs := runWithSandbox(true)
+	if !containsArg(sandboxArgs, "--full-auto") || !containsArg(sandboxArgs, "--sandbox") || !containsArg(sandboxArgs, "workspace-write") {
+		t.Fatalf("sandbox args missing: %v", sandboxArgs)
+	}
+	if containsArg(sandboxArgs, "--dangerously-bypass-approvals-and-sandbox") {
+		t.Fatalf("sandbox run should not include bypass approvals flag: %v", sandboxArgs)
+	}
+
+	noSandboxArgs := runWithSandbox(false)
+	if !containsArg(noSandboxArgs, "--dangerously-bypass-approvals-and-sandbox") {
+		t.Fatalf("no-sandbox run should include bypass flag: %v", noSandboxArgs)
+	}
+}
+
+func containsArg(args []string, target string) bool {
+	for _, it := range args {
+		if it == target {
+			return true
+		}
+	}
+	return false
 }

@@ -32,7 +32,7 @@
 ```bash
 gofmt -w $(rg --files -g '*.go')
 go test ./...
-./scripts/check_go_coverage_gate.sh
+.venv/bin/python scripts/agents/check_all_gates.py
 ```
 
 覆盖率门禁要求：
@@ -40,6 +40,14 @@ go test ./...
 - Go 代码总体覆盖率必须 `>= 80%`
 - 含有具体代码逻辑（存在可统计语句）的 Go 文件不允许 `0%` 覆盖率
 - Go 单元测试文件必须按同名规则放置：`xxx.go` 的单元测试必须写在 `xxx_test.go`（例如 `client.go` -> `client_test.go`）
+- 简单 e2e/集成测试（不依赖多系统/外部系统协作）必须用 Go 测试方式实现，并纳入 `make test`
+
+时间与时区约束：
+
+- Go 内部统一通过 `internal/utils.NowUTC()` 获取当前时间，禁止在生产代码直接调用 `time.Now()`。
+- 持久化/传输层统一使用 UTC/ISO（Go `time.Time` 的 RFC3339 JSON 序列化）。
+- WebUI 展示层统一通过 `webui/src/utils/format.ts` 的 `formatLocalDateTime` 输出本地时间文本。
+- 禁止在业务组件中直接使用 `toLocaleString/toLocaleDateString/toLocaleTimeString`。
 
 ## Vue / TypeScript（前端）
 
@@ -72,4 +80,9 @@ cd webui && pnpm build
 - 一个 PR/提交聚焦一个目标，避免混入无关改动。
 - 文档、代码、配置保持同步更新。
 - 自动化流程当前仅使用 `scripts/run_codex_on_plan.py`。
-- 仓库内不再维护内置 agents 脚本，统一由外部 Agent-Coder 管理。
+- 门禁脚本统一放在 `scripts/agents/`，并要求使用仓库根目录 `.venv` 执行。
+
+## E2E 分层约束
+
+- 复杂多系统/外部系统协作测试放在 `tests/e2e/`，用 Python `unittest` 脚本编排环境并校验 API/数据库/文件系统状态。
+- 前端行为 e2e 放在 `tests/playwright/`，用 Python `unittest` 脚本编排环境并调用 Playwright；必要时追加 API/数据库/文件系统校验。

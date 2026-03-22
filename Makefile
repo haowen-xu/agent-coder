@@ -1,10 +1,13 @@
-.PHONY: run tidy test test-gate webui-install webui-dev webui-build codex-plan
+.PHONY: run build worker tidy test all-gates webui-install webui-dev webui-build codex-plan
 
-run:
+run: webui-build
 	go run ./cmds server --config config.yaml
 
 worker:
 	go run ./cmds worker --config config.yaml
+
+build: webui-build
+	go build ./cmds
 
 tidy:
 	go mod tidy
@@ -12,8 +15,8 @@ tidy:
 test:
 	go test ./...
 
-test-gate:
-	./scripts/check_go_coverage_gate.sh
+all-gates:
+	.venv/bin/python scripts/agents/check_all_gates.py
 
 webui-install:
 	cd webui && pnpm install

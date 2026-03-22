@@ -25,5 +25,13 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Run Go unit tests with coverage gate
-        run: ./scripts/check_go_coverage_gate.sh
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Create venv for gates
+        run: python -m venv .venv
+
+      - name: Run quality gates
+        run: .venv/bin/python scripts/agents/check_all_gates.py

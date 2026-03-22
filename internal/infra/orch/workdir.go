@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/haowen-xu/agent-coder/internal/utils"
 )
 
 const (
@@ -115,7 +117,7 @@ func (w *WorkDir) WriteState(runDir string, state State) error {
 		return err
 	}
 	if state.UpdatedAt.IsZero() {
-		state.UpdatedAt = time.Now().UTC()
+		state.UpdatedAt = utils.NowUTC()
 	}
 	raw, err := json.MarshalIndent(state, "", "  ")
 	if err != nil {

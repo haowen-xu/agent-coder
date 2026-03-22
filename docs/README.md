@@ -8,6 +8,8 @@
 - [database-schema.md](database-schema.md)：数据库模型与状态机约束
 - [agent-runtime.md](agent-runtime.md)：Agent 抽象与 worker 调用行为
 - [config-runtime.md](config-runtime.md)：配置模型与工作区规则
+- [datetime-timezone.md](datetime-timezone.md)：时间存储/处理/展示与门禁规范
+- [testing-strategy.md](testing-strategy.md)：测试分层策略（Go 集成 / Python e2e / Python+Playwright）
 - [automation-codex-plan.md](automation-codex-plan.md)：`run_codex_on_plan.py` 执行流
 - [code-style/README.md](code-style/README.md)：代码规范
 - [requirements.md](requirements.md)：产品需求定稿与验收标准
@@ -15,6 +17,7 @@
 ## 子目录
 
 - [plans/README.md](plans/README.md)：计划文档规范与当前计划
+- [../tests/README.md](../tests/README.md)：复杂 e2e 与 Playwright e2e 运行入口
 
 ## 清理原则
 

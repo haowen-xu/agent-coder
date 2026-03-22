@@ -67,7 +67,11 @@
 
   <el-table :data="runLogs" height="300" class="mt-12">
     <el-table-column label="Seq" prop="seq" width="80" />
-    <el-table-column label="At" prop="at" width="190" />
+    <el-table-column label="At" width="190">
+      <template #default="scope">
+        {{ formatLocalDateTime(scope.row.at) }}
+      </template>
+    </el-table-column>
     <el-table-column label="Level" prop="level" width="90" />
     <el-table-column label="Stage" prop="stage" width="120" />
     <el-table-column label="Event" prop="event_type" width="130" />
@@ -78,6 +82,7 @@
 <script setup lang="ts">
 import type { AdminIssueRow, AdminProjectRow, IssueRunRow, OpsMetrics, RunLogRow } from '../../stores/admin'
 import ProjectSelect from '../common/ProjectSelect.vue'
+import { formatLocalDateTime } from '../../utils/format'
 
 defineProps<{
   projects: AdminProjectRow[]

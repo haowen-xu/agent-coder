@@ -137,3 +137,9 @@ bootstrap:
 - `secret.provider=env` 时环境变量键格式：
   - `<env_prefix><SANITIZED_REF>`
   - `SANITIZED_REF`：大写且非字母数字替换为 `_`
+
+## 8. 时间与时区
+
+- 运行时统一采用 UTC 语义处理“当前时间”（通过 `internal/utils.NowUTC()`）。
+- PostgreSQL DSN 建议显式设置 `TimeZone=UTC`，避免连接会话时区漂移。
+- WebUI 时间显示格式化规范见 [datetime-timezone.md](datetime-timezone.md)。

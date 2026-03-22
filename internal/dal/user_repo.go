@@ -3,11 +3,11 @@ package db
 import (
 	"context"
 	"errors"
-	"time"
 
 	"gorm.io/gorm"
 
 	"github.com/haowen-xu/agent-coder/internal/auth"
+	"github.com/haowen-xu/agent-coder/internal/utils"
 	"github.com/haowen-xu/agent-coder/internal/xerr"
 )
 
@@ -102,7 +102,7 @@ func (c *Client) GetSessionWithUser(ctx context.Context, token string) (*UserSes
 	if err != nil {
 		return nil, nil, xerr.Infra.Wrap(err, "query session")
 	}
-	if sess.ExpiredAt.Before(time.Now()) {
+	if sess.ExpiredAt.Before(utils.NowUTC()) {
 		return nil, nil, nil
 	}
 

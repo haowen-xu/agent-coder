@@ -5,7 +5,8 @@
 - 后端：Go、Hertz、Cobra、Viper、slog、errorx、GORM
 - 数据库：SQLite / PostgreSQL（同一套 GORM DAL）
 - 前端：pnpm、Vite、Vue3、Pinia、Element Plus
-- 自动化脚本：Python（`scripts/run_codex_on_plan.py`）
+- 自动化脚本：Python（`scripts/run_codex_on_plan.py`、`scripts/agents/*.py`）
+- 测试编排：Go `testing` + Python `unittest` + Playwright
 
 ## 分层原则
 
@@ -26,6 +27,7 @@
 │   └── sync_issues.go
 ├── internal/
 │   ├── app/
+│   │   └── httpserver/
 │   ├── auth/
 │   ├── config/
 │   ├── dal/
@@ -38,9 +40,20 @@
 │   │   ├── metrics_repo.go
 │   │   └── prompt_template.go
 │   ├── handler/
-│   │   └── httpserver/
+│   │   ├── auth/
+│   │   ├── user/
+│   │   ├── project/
+│   │   ├── issue/
+│   │   ├── issue_run/
+│   │   ├── ops/
+│   │   └── httputil/
 │   ├── service/
-│   │   ├── core/
+│   │   ├── user/
+│   │   ├── project/
+│   │   ├── issue/
+│   │   ├── issue_run/
+│   │   ├── ops/
+│   │   ├── core/                # legacy 兼容层，逐步迁移中
 │   │   └── worker/
 │   ├── infra/
 │   │   ├── agent/
@@ -58,15 +71,27 @@
 │   └── xerr/
 ├── webui/
 ├── scripts/
+│   ├── agents/              # 质量门禁脚本（coverage/datetime）
+│   └── run_codex_on_plan.py
+├── tests/
+│   ├── e2e/                 # Python unittest：复杂多系统/外部系统协作测试
+│   └── playwright/          # Python unittest：环境编排 + Playwright 前端行为测试
 └── docs/
 ```
 
 ## 命令入口（Cobra）
 
-- `go run ./cmds server --config config.yaml`：启动 API 服务 + 静态资源。
+- `make run`：启动 API 服务（会先执行 `cd webui && pnpm build`）。
+- `make test`：执行 Go 测试（包含简单 e2e/集成测试）。
 - `go run ./cmds worker --config config.yaml`：启动轮询与执行循环。
 - `go run ./cmds migrate --config config.yaml`：执行数据库迁移。
 - `go run ./cmds sync-issues --config config.yaml`：手动触发一次 issue 同步。
+
+## 测试分层（规范）
+
+- 简单 e2e/集成测试：用 Go `*_test.go` 编写，纳入 `make test`。
+- 复杂多系统/外部系统协作：放在 `tests/e2e/`，由 Python `unittest` 负责环境拉起与校验（API/DB/文件系统）。
+- 前端行为 e2e：放在 `tests/playwright/`，由 Python `unittest` 负责环境拉起并调用 Playwright，必要时补充 API/DB/文件系统校验。
 
 ## HTTP 路由分组
 
@@ -114,5 +139,5 @@
 ## 自动化脚本范围
 
 - 自动化计划执行当前仅支持 `scripts/run_codex_on_plan.py`。
-- 仓库内不再维护内置 agents 脚本，统一由外部 Agent-Coder 管理。
+- 门禁脚本统一维护在 `scripts/agents/`。
 - Autofix 产物目录统一使用 `.ai-docs/autofix/`。

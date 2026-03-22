@@ -3,7 +3,7 @@
 ## 背景
 
 - 目标：完成后端与前端初始化后的收尾工作，并验证可运行性。
-- 约束：当前仅使用 `scripts/run_codex_on_plan.py`；内置 agents 脚本已移除，由外部 Agent-Coder 管理。
+- 约束：当前计划执行仅使用 `scripts/run_codex_on_plan.py`；质量门禁脚本位于 `scripts/agents/`。
 
 ## Task 列表
 

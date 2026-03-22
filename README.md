@@ -45,8 +45,10 @@
   - `worker`：启动调度与执行循环
   - `migrate`：初始化/迁移数据库
   - `sync-issues`：手动触发一次同步
-- `internal/handler/httpserver`：HTTP 路由、鉴权、中间件、静态资源挂载
-- `internal/service/core`：核心业务（项目、Issue、管理端能力）
+- `internal/app/httpserver`：HTTP Server 装配与静态资源挂载
+- `internal/handler/*`：按对象拆分的 Hertz Handler（`auth/user/project/issue/issue_run/ops`）
+- `internal/service/*`：按对象拆分的业务服务（`user/project/issue/issue_run/ops`）
+- `internal/service/core`：历史兼容服务层（逐步迁移中）
 - `internal/service/worker`：调度与状态机执行
 - `internal/dal`：GORM 数据访问（SQLite/PostgreSQL）
 - `internal/infra/repo/*`：仓库协作平台实现（当前 GitLab）
@@ -55,11 +57,34 @@
 ## 运行方式
 
 ```bash
-# 启动 API 服务
-go run ./cmds server --config config.yaml
+# 调试/启动 API（会先执行 webui build）
+make run
 
 # 启动 Worker
 go run ./cmds worker --config config.yaml
+
+# 打包（会先执行 webui build）
+make build
+```
+
+质量门禁脚本统一位于 `scripts/agents/`，统一入口为：
+
+```bash
+.venv/bin/python scripts/agents/check_all_gates.py
+```
+
+测试分层约束：
+
+- 简单 e2e/集成测试（不需要多系统/外部系统协作）用 Go 测试编写并纳入 `make test`。
+- 复杂多系统/外部系统协作测试放在 `tests/e2e/`，由 Python `unittest` 脚本编排环境并验证 API/DB/文件系统。
+- 需要验证前端行为的 e2e 测试放在 `tests/playwright/`，由 Python `unittest` 脚本编排环境并调用 Playwright。
+
+推荐执行：
+
+```bash
+make test
+.venv/bin/python -m unittest tests.e2e.test_runtime_e2e -v
+.venv/bin/python -m unittest tests.playwright.test_playwright_e2e -v
 ```
 
 更多设计与字段约束请参考：
@@ -68,3 +93,4 @@ go run ./cmds worker --config config.yaml
 - `docs/agent-runtime.md`
 - `docs/config-runtime.md`
 - `docs/database-schema.md`
+- `docs/testing-strategy.md`

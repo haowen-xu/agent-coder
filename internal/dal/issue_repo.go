@@ -3,10 +3,10 @@ package db
 import (
 	"context"
 	"errors"
-	"time"
 
 	"gorm.io/gorm"
 
+	"github.com/haowen-xu/agent-coder/internal/utils"
 	"github.com/haowen-xu/agent-coder/internal/xerr"
 )
 
@@ -131,7 +131,7 @@ func (c *Client) TouchIssueSync(ctx context.Context, issueID uint) error {
 	if c == nil || c.db == nil {
 		return xerr.Infra.New("db is not initialized")
 	}
-	err := c.db.WithContext(ctx).Model(&Issue{}).Where("id = ?", issueID).Update("last_synced_at", time.Now()).Error
+	err := c.db.WithContext(ctx).Model(&Issue{}).Where("id = ?", issueID).Update("last_synced_at", utils.NowUTC()).Error
 	if err != nil {
 		return xerr.Infra.Wrap(err, "touch issue sync")
 	}
@@ -154,8 +154,8 @@ func (c *Client) BindIssueRunIfIdle(ctx context.Context, issueID uint, runID uin
 			"lifecycle_status": IssueLifecycleRunning,
 			"close_reason":     nil,
 			"branch_name":      branch,
-			"last_synced_at":   time.Now(),
-			"updated_at":       time.Now(),
+			"last_synced_at":   utils.NowUTC(),
+			"updated_at":       utils.NowUTC(),
 		})
 	if res.Error != nil {
 		return false, xerr.Infra.Wrap(res.Error, "bind issue run if idle")

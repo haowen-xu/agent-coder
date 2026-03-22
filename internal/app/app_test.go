@@ -38,7 +38,14 @@ func TestAppNewAndClose(t *testing.T) {
 	if err != nil {
 		t.Fatalf("app New failed: %v", err)
 	}
-	if application.Config == nil || application.DB == nil || application.CoreService == nil || application.Server == nil {
+	if application.Config == nil ||
+		application.DB == nil ||
+		application.UserService == nil ||
+		application.ProjectSvc == nil ||
+		application.IssueSvc == nil ||
+		application.IssueRunSvc == nil ||
+		application.OpsSvc == nil ||
+		application.Server == nil {
 		t.Fatalf("app components should be initialized")
 	}
 
