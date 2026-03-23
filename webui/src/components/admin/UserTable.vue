@@ -1,7 +1,12 @@
 <template>
-  <el-table :data="users" height="500" class="mt-12">
+  <el-table :data="users" height="560">
     <el-table-column label="ID" prop="id" width="70" />
     <el-table-column label="用户名" prop="username" min-width="120" />
+    <el-table-column label="最近登录" min-width="170">
+      <template #default="scope">
+        {{ scope.row.last_login_at || '-' }}
+      </template>
+    </el-table-column>
     <el-table-column label="Admin" min-width="90">
       <template #default="scope">
         <el-tag :type="scope.row.is_admin ? 'warning' : 'info'" size="small">
@@ -18,6 +23,7 @@
     </el-table-column>
     <el-table-column label="操作" min-width="180">
       <template #default="scope">
+        <el-button link type="primary" @click="emit('edit', scope.row)">编辑</el-button>
         <el-button link type="primary" @click="emit('toggleAdmin', scope.row)">
           {{ scope.row.is_admin ? '取消管理员' : '设为管理员' }}
         </el-button>
@@ -37,13 +43,8 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
+  edit: [row: AdminUserRow]
   toggleAdmin: [row: AdminUserRow]
   toggleEnabled: [row: AdminUserRow]
 }>()
 </script>
-
-<style scoped>
-.mt-12 {
-  margin-top: 12px;
-}
-</style>

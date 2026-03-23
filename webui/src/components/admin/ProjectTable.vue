@@ -1,11 +1,5 @@
 <template>
-  <el-table
-    :data="projects"
-    height="520"
-    highlight-current-row
-    row-key="project_key"
-    @current-change="onRowChange"
-  >
+  <el-table :data="projects" height="560" row-key="project_key">
     <el-table-column label="Key" prop="project_key" min-width="140" />
     <el-table-column label="Slug" prop="project_slug" min-width="180" />
     <el-table-column label="名称" prop="name" min-width="120" />
@@ -23,6 +17,14 @@
         </el-tag>
       </template>
     </el-table-column>
+    <el-table-column label="操作" min-width="170" fixed="right">
+      <template #default="scope">
+        <el-button link type="primary" @click="emit('edit', scope.row)">编辑</el-button>
+        <el-button link type="primary" @click="emit('toggleEnabled', scope.row)">
+          {{ scope.row.enabled ? '禁用' : '启用' }}
+        </el-button>
+      </template>
+    </el-table-column>
   </el-table>
 </template>
 
@@ -34,10 +36,7 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  select: [row: AdminProjectRow | null]
+  edit: [row: AdminProjectRow]
+  toggleEnabled: [row: AdminProjectRow]
 }>()
-
-function onRowChange(row: AdminProjectRow | null) {
-  emit('select', row)
-}
 </script>

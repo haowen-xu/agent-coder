@@ -1,7 +1,7 @@
 <template>
-  <el-form label-width="140px" class="project-form" @submit.prevent="emit('save')">
+  <el-form label-width="140px" class="project-form">
     <el-form-item label="project_key">
-      <el-input v-model="projectForm.project_key" placeholder="demo" />
+      <el-input v-model="projectForm.project_key" :disabled="Boolean(editingProjectKey)" placeholder="demo" />
     </el-form-item>
     <el-form-item label="project_slug">
       <el-input v-model="projectForm.project_slug" placeholder="group/repo" />
@@ -63,15 +63,6 @@
     <el-form-item label="label_merged">
       <el-input v-model="projectForm.label_merged" />
     </el-form-item>
-    <el-form-item>
-      <div class="form-inline-row">
-        <el-button type="primary" :loading="loading" @click="emit('save')">
-          {{ editingProjectKey ? '更新项目' : '创建项目' }}
-        </el-button>
-        <el-button @click="emit('reset')">重置</el-button>
-        <span v-if="editingProjectKey" class="editing-tip">当前编辑: {{ editingProjectKey }}</span>
-      </div>
-    </el-form-item>
   </el-form>
 </template>
 
@@ -81,32 +72,14 @@ import type { UpsertProjectInput } from '../../stores/admin'
 defineProps<{
   projectForm: UpsertProjectInput
   editingProjectKey: string
-  loading: boolean
-}>()
-
-const emit = defineEmits<{
-  save: []
-  reset: []
 }>()
 </script>
 
 <style scoped>
 .project-form {
-  max-height: 600px;
+  max-height: 62vh;
   overflow: auto;
   padding-right: 8px;
-}
-
-.form-inline-row {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.editing-tip {
-  color: #5f6b7a;
-  font-size: 12px;
 }
 
 .form-help {
@@ -117,7 +90,7 @@ const emit = defineEmits<{
 
 @media (max-width: 768px) {
   .project-form {
-    max-height: none;
+    max-height: 56vh;
     overflow: visible;
   }
 }
