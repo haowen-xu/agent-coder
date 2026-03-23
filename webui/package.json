@@ -11,6 +11,7 @@
     "test:e2e": "cd .. && .venv/bin/python -m unittest tests.playwright.test_playwright_e2e -v"
   },
   "dependencies": {
+    "@element-plus/icons-vue": "^2.3.2",
     "element-plus": "^2.11.4",
     "pinia": "^3.0.3",
     "vue": "^3.5.22",
