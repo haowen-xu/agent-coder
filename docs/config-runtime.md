@@ -15,7 +15,7 @@ app:
 
 server:
   host: 0.0.0.0
-  port: 8080
+  port: 25790
   read_timeout: 15s
   write_timeout: 15s
   shutdown_timeout: 10s

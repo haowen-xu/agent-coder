@@ -163,12 +163,12 @@ func TestDurationHelpers(t *testing.T) {
 
 	server := ServerConfig{
 		Host:            "0.0.0.0",
-		Port:            8080,
+		Port:            25790,
 		ReadTimeout:     "2s",
 		WriteTimeout:    "3s",
 		ShutdownTimeout: "4s",
 	}
-	if server.Address() != "0.0.0.0:8080" {
+	if server.Address() != "0.0.0.0:25790" {
 		t.Fatalf("unexpected address: %s", server.Address())
 	}
 	if server.ReadTimeoutDuration() != 2*time.Second {
@@ -234,7 +234,7 @@ func TestSetDefaults(t *testing.T) {
 		t.Fatalf("unmarshal default config failed: %v", err)
 	}
 
-	if cfg.App.Name != "agent-coder" || cfg.Server.Port != 8080 {
+	if cfg.App.Name != "agent-coder" || cfg.Server.Port != 25790 {
 		t.Fatalf("unexpected defaults: app=%s port=%d", cfg.App.Name, cfg.Server.Port)
 	}
 	if cfg.Agent.Codex.TimeoutSec != 7200 || cfg.Scheduler.PollIntervalSec != 30 {
@@ -320,7 +320,7 @@ func newValidConfig() Config {
 	return Config{
 		Server: ServerConfig{
 			Host:            "0.0.0.0",
-			Port:            8080,
+			Port:            25790,
 			ReadTimeout:     "15s",
 			WriteTimeout:    "15s",
 			ShutdownTimeout: "10s",
