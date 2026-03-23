@@ -10,7 +10,9 @@
       <el-input v-model="projectForm.name" placeholder="项目名" />
     </el-form-item>
     <el-form-item label="provider">
-      <el-input v-model="projectForm.provider" placeholder="gitlab" />
+      <el-select v-model="projectForm.provider" style="width: 100%">
+        <el-option label="gitlab" value="gitlab" />
+      </el-select>
     </el-form-item>
     <el-form-item label="provider_url">
       <el-input v-model="projectForm.provider_url" placeholder="https://gitlab.example.com/api/v4" />
